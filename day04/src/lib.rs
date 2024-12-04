@@ -82,13 +82,21 @@ impl<'a> Day04<'a> {
 mod tests {
     use super::*;
 
-    const SAMPLE_INPUT_1: &str =
+    #[test]
+    fn sample1_for_part1_is_4() {
+        const SAMPLE_INPUT =
 "..X...
 .SAMX.
 .A..A.
 XMAS.S
 .X....";
-    const SAMPLE_INPUT_2: &str =
+        let day = Day04::new(SAMPLE_INPUT.lines());
+        assert_eq!(4, day.part1());
+    }
+
+    #[test]
+    fn sample2_for_part1_is_18() {
+        const SAMPLE_INPUT_2: &str =
 "MMMSXXMASM
 MSAMXMSMSA
 AMXSXMAAMM
@@ -99,7 +107,13 @@ SMSMSASXSS
 SAXAMASAAA
 MAMMMXMMMM
 MXMXAXMASX";
-    const SAMPLE_INPUT_3: &str =
+        let day = Day04::new(SAMPLE_INPUT_2.lines());
+        assert_eq!(18, day.part1());
+    }
+
+    #[test]
+    fn sample3_for_part1_is_18() {
+        const SAMPLE_INPUT_3: &str =
 "....XXMAS.
 .SAMXMS...
 ...S..A...
@@ -110,21 +124,6 @@ S.S.S.S.SS
 .A.A.A.A.A
 ..M.M.M.MM
 .X.X.XMASX";
-
-    #[test]
-    fn sample1_for_part1_is_4() {
-        let day = Day04::new(SAMPLE_INPUT_1.lines());
-        assert_eq!(4, day.part1());
-    }
-
-    #[test]
-    fn sample2_for_part1_is_18() {
-        let day = Day04::new(SAMPLE_INPUT_2.lines());
-        assert_eq!(18, day.part1());
-    }
-
-    #[test]
-    fn sample3_for_part1_is_18() {
         let day = Day04::new(SAMPLE_INPUT_3.lines());
         assert_eq!(18, day.part1());
     }
