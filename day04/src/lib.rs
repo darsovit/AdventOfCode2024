@@ -76,6 +76,34 @@ impl<'a> Day04<'a> {
         }
         sum_of_xmases
     }
+
+    fn test_for_mas_cross(&self, a_row: usize, a_col: usize) -> bool {
+
+        if a_row > 0 && a_row+1 < self.input.len() && a_col > 0 && a_col+1 < self.input[a_row].len() {
+            match (&self.input[a_row-1][a_col-1..a_col], &self.input[a_row+1][a_col-1..a_col], &self.input[a_row-1][a_col+1..a_col+2], &self.input[a_row+1][a_col+1..a_col+2]) {
+                ("M", "M", "S", "S") => true,
+                ("M", "S", "M", "S") => true,
+                ("S", "M", "S", "M") => true,
+                ("S", "S", "M", "M") => true,
+                (_, _, _, _) => false
+            }
+        }
+        else {
+            false
+        }
+    }
+
+    pub fn part2(&self) -> u32 {
+        let mut sum_of_mas_crosses: u32 = 0;
+        for (index, row) in self.input.clone().into_iter().enumerate() {
+            for jindex in row.match_indices("A").map(|(i, _)|i) {
+                if self.test_for_mas_cross(index, jindex) {
+                    sum_of_mas_crosses += 1;
+                }
+            }
+        }
+        sum_of_mas_crosses
+    }
 }
 
 #[cfg(test)]
@@ -84,7 +112,7 @@ mod tests {
 
     #[test]
     fn sample1_for_part1_is_4() {
-        const SAMPLE_INPUT =
+        const SAMPLE_INPUT: &str =
 "..X...
 .SAMX.
 .A..A.
@@ -156,5 +184,32 @@ S..S..S";
 SAMXMAS";
         let day = Day04::new(SAMPLE_INPUT.lines());
         assert_eq!(4, day.part1());
+    }
+
+    #[test]
+    fn part2_first_example() {
+        const SAMPLE_INPUT: &str =
+"M.S
+.A.
+M.S";
+        let day = Day04::new(SAMPLE_INPUT.lines());
+        assert_eq!(1, day.part2());
+    }
+
+    #[test]
+    fn part2_second_example() {
+        const SAMPLE_INPUT: &str =
+".M.S......
+..A..MSMS.
+.M.S.MAA..
+..A.ASMSM.
+.M.S.M....
+..........
+S.S.S.S.S.
+.A.A.A.A..
+M.M.M.M.M.
+..........";
+        let day = Day04::new(SAMPLE_INPUT.lines());
+        assert_eq!(9, day.part2());
     }
 }
