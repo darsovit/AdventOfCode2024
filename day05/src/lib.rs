@@ -3,14 +3,15 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 
 pub struct Day05 {
-    page_ordering_rules: Vec::<(u32, u32)>,
+    pages_that_come_before: HashMap<u32, HashSet<u32>>,
     page_lists: Vec<Vec<u32>>,
 }
 
 impl Day05 {
     pub fn new(lines: std::str::Lines<'_>) -> Self {
         let mut empty_line: Option<usize> = None;
-        let mut page_ordering_rules: Vec::<(u32, u32)> = Vec::new();
+        
+        let mut pages_that_come_before: HashMap<u32, HashSet<u32>> = HashMap::new();
         let mut page_lists: Vec<Vec<u32>> = Vec::new();
         for (index, line) in lines.enumerate() {
             if let None = empty_line {
@@ -18,7 +19,10 @@ impl Day05 {
                     empty_line = Some(index);
                 } else {
                     let mut items = line.split("|").map(|p|p.parse::<u32>().unwrap());
-                    page_ordering_rules.push( (items.next().unwrap(), items.next().unwrap()) );
+                    let (before, after) = (items.next().unwrap(), items.next().unwrap());
+                    pages_that_come_before.entry(after).or_insert(HashSet::<u32>::new());
+                    pages_that_come_before.entry(after).and_modify(|e| { e.insert(before); });
+
                     assert!(items.next() == None);
                 }
             }
@@ -27,7 +31,7 @@ impl Day05 {
                 page_lists.push(page_list);
             }
         }
-        Day05{page_ordering_rules, page_lists}
+        Day05{pages_that_come_before, page_lists}
     }
 
     fn determine_middle_page_if_good(page_list: &Vec<u32>, good: bool) -> u32 {
@@ -38,12 +42,11 @@ impl Day05 {
         }
     }
 
-    fn build_hashset_of_predicates(&self, page: u32) -> HashSet<u32> {
-        let mut matches = HashSet::new();
-        for matching_rule in self.page_ordering_rules.clone().into_iter().filter(|(_, b)| *b==page) {
-            matches.insert(matching_rule.0);
+    fn get_hashset_of_predicates(&self, page: u32) -> HashSet<u32> {
+        match self.pages_that_come_before.get(&page) {
+            Some(v) => v.clone(),
+            None => HashSet::new()
         }
-        matches
     }
 
     fn build_hashset_from_page_list(page_list: &Vec<u32>) -> HashSet::<u32> {
@@ -61,7 +64,7 @@ impl Day05 {
         let mut pages_after = Self::build_hashset_from_page_list(page_list);
         for page in page_list {
             pages_after.remove(page);
-            let page_set_required_before = self.build_hashset_of_predicates(*page);
+            let page_set_required_before = self.get_hashset_of_predicates(*page);
             if page_set_required_before.intersection(&pages_after).count() > 0 {
                 return false;
             }
@@ -82,7 +85,7 @@ impl Day05 {
         let mut page_rules: HashMap<u32, HashSet<u32>> = HashMap::new();
         let mut pages = HashSet::new();
         for page in page_list {
-            page_rules.insert(*page, self.build_hashset_of_predicates(*page));
+            page_rules.insert(*page, self.get_hashset_of_predicates(*page));
             pages.insert(*page);
         }
 
