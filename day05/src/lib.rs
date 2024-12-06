@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use std::collections::HashMap;
+use std::collections::VecDeque;
 
 pub struct Day05 {
     page_ordering_rules: Vec::<(u32, u32)>,
@@ -76,18 +78,57 @@ impl Day05 {
         sum
     }
 
+    fn fix_page_order(&self, page_list: &Vec<u32>) -> Vec<u32> {
+        let mut page_rules: HashMap<u32, HashSet<u32>> = HashMap::new();
+        let mut pages = HashSet::new();
+        for page in page_list {
+            page_rules.insert(*page, self.build_hashset_of_predicates(*page));
+            pages.insert(*page);
+        }
+
+        let mut good_page_order: VecDeque::<u32> = VecDeque::new();
+
+        while page_rules.len() > 0 {
+            let mut pages_not_in_other_rules: Vec<u32> = Vec::new();
+            for page in &pages {
+                let mut found = false;
+                for (_, earlier_pages) in &page_rules {
+                    if earlier_pages.contains(page) {
+                        found = true;
+                    }
+                }
+                if !found { 
+                    pages_not_in_other_rules.push(*page);
+                }
+            }
+
+            for page in pages_not_in_other_rules {
+                good_page_order.push_front(page);
+                page_rules.remove(&page);
+                pages.remove(&page);
+            }
+
+        }
+
+        good_page_order.into_iter().collect()
+
+    }
+
     pub fn part2(&self) -> u32 {
-        0
+        let mut sum: u32 = 0;
+        for page_list in &self.page_lists {
+            if !self.does_page_order_follow_rules(page_list) {
+                sum += Self::determine_middle_page_if_good(&self.fix_page_order(&page_list), true);
+            }
+        }
+        sum
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn sample_input_gives_example_out() {
-        const SAMPLE_INPUT: &str = "47|53
+    const SAMPLE_INPUT: &str = "47|53
 97|13
 97|61
 97|47
@@ -115,7 +156,15 @@ mod tests {
 75,97,47,61,53
 61,13,29
 97,13,75,29,47";
+    #[test]
+    fn sample_input_gives_example_out() {
         let day = Day05::new(SAMPLE_INPUT.lines());
         assert_eq!(143, day.part1());
+    }
+
+    #[test]
+    fn sample_input_gives_part2_example_out() {
+        let day: Day05 = Day05::new(SAMPLE_INPUT.lines());
+        assert_eq!(123, day.part2());
     }
 }
