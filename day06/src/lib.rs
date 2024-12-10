@@ -1,10 +1,14 @@
 use std::collections::HashSet;
+use std::collections::HashMap;
 
-pub struct Day06<'a> {
-    map: Vec<&'a str>,
+pub struct Day06 {
+    obstacles: HashSet<(usize, usize)>,
+    max_y: usize,
+    max_x: usize,
+    guard_start_pos_and_dir: ((usize, usize), Direction),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 enum Direction {
     North,
     South,
@@ -12,18 +16,25 @@ enum Direction {
     West,
 }
 
-impl<'a> Day06<'a> {
-    pub fn new(lines: std::str::Lines<'a>) -> Self {
-        Day06{map: lines.collect()}
+impl Day06 {
+    pub fn new(lines: std::str::Lines<'_>) -> Self {
+        let mut obstacles: HashSet<(usize, usize)> = HashSet::new();
+        let mut guard_pos_and_dir: Option<((usize, usize), Direction)> = None;
+        let map: Vec<&str> = lines.collect();
+        let max_y = map.len();
+        let max_x = map[0].len();
+        for (y_index, line) in map.into_iter().enumerate() {
+            for (x_index, a_char) in line.chars().enumerate() {
+                match a_char {
+                    '#' => { obstacles.insert((y_index, x_index)); },
+                    '^' => { if let None = guard_pos_and_dir { guard_pos_and_dir = Some(((y_index, x_index), Direction::North )); } },
+                    _ => { /* no-op */ }
+                }
+            }
+        }
+        Day06{obstacles, max_y, max_x, guard_start_pos_and_dir: guard_pos_and_dir.unwrap()}
     }
 
-    fn find_guard_start_position(map: &Vec<&str>) -> Option<(i32, i32, Direction)> {
-        for (yindex, line) in map.into_iter().enumerate() {
-            let guard_pos = line.find("^");
-            if let Some(xindex) = guard_pos { return Some((yindex as i32, xindex as i32, Direction::North)); }
-        }
-        None
-    }
     fn direction_to_increment(dir: Direction) -> (i32, i32) {
         match dir {
             Direction::North => (-1, 0),
@@ -33,16 +44,17 @@ impl<'a> Day06<'a> {
         }
     }
 
-    fn calc_next_pos_in_direction(&self, guard_pos: &(i32, i32, Direction)) -> Option<((i32, i32, Direction), &str)> {
-        let dir_increment = Self::direction_to_increment(guard_pos.2);
-        let new_position = (guard_pos.0 + dir_increment.0, guard_pos.1 + dir_increment.1, guard_pos.2);
-        if new_position.0 < 0 || new_position.0 as usize >= self.map.len() || new_position.1 < 0 || new_position.1 as usize >= self.map[0].len() {
+    fn calc_next_pos_in_direction(&self, guard_pos: &((usize, usize), Direction)) -> Option<(((usize, usize), Direction), &str)> {
+        let dir_increment = Self::direction_to_increment(guard_pos.1);
+
+        let new_position = (guard_pos.0.0 as i32 + dir_increment.0, guard_pos.0.1 as i32 + dir_increment.1);
+        if new_position.0 < 0 || new_position.0 as usize >= self.max_y || new_position.1 < 0 || new_position.1 as usize >= self.max_x {
             None
         }
         else {
-            let slicer = new_position.1 as usize;
-            let yindex: usize = new_position.0 as usize;
-            Some((new_position, &self.map[yindex][slicer..slicer+1]))
+            let next_pos = ((new_position.0 as usize, new_position.1 as usize), guard_pos.1);
+            let is_obstacle = self.obstacles.get(&next_pos.0);
+             Some((next_pos, if let None = is_obstacle { "." } else { "#" }))
         }
     }
 
@@ -54,10 +66,10 @@ impl<'a> Day06<'a> {
             Direction::West => Direction::North,
         }
     }
-    fn turn_guard(guard_pos: (i32, i32, Direction)) -> (i32, i32, Direction) {
-        (guard_pos.0, guard_pos.1, Self::next_direction(guard_pos.2))
+    fn turn_guard(guard_pos: ((usize, usize), Direction)) -> ((usize, usize), Direction) {
+        (guard_pos.0, Self::next_direction(guard_pos.1))
     }
-    fn find_next_guard_position(&self, guard_pos: (i32, i32, Direction)) -> Option<(i32, i32, Direction)> {
+    fn find_next_guard_position(&self, guard_pos: ((usize, usize), Direction)) -> Option<((usize, usize), Direction)> {
         let mut cur_guard_pos = guard_pos;
         loop {
             let next_guard_pos_and_item = self.calc_next_pos_in_direction(&cur_guard_pos);
@@ -76,13 +88,14 @@ impl<'a> Day06<'a> {
 
     pub fn part1(&self) -> usize {
         let mut guard_views: HashSet<(i32, i32)> = HashSet::new();
-        let mut guard_pos = Self::find_guard_start_position(&self.map).unwrap();
-        guard_views.insert((guard_pos.0, guard_pos.1));
+        //let mut guard_pos = (self.guard_start_pos_and_dir.0.0 as i32, self.guard_start_pos_and_dir.0.1 as i32, self.guard_start_pos_and_dir.1);
+        let mut guard_pos = self.guard_start_pos_and_dir;
+        guard_views.insert((guard_pos.0.0 as i32, guard_pos.0.1 as i32));
 
         loop {
             let possible_guard_pos = self.find_next_guard_position(guard_pos);
             if let Some(a_guard_pos) = possible_guard_pos {
-                guard_views.insert((a_guard_pos.0, a_guard_pos.1));
+                guard_views.insert((a_guard_pos.0.0 as i32, a_guard_pos.0.1 as i32));
                 guard_pos = a_guard_pos;
             } else {
                 break;
@@ -90,15 +103,45 @@ impl<'a> Day06<'a> {
         }
         guard_views.len()
     }
+
+    pub fn part2(&self) -> u32 {
+        let mut count_of_possible_loops = 0;
+
+        let mut guard_views: HashMap<(usize, usize), HashSet<Direction>> = HashMap::new();
+        //let mut guard_pos = (self.guard_start_pos_and_dir.0.0 as i32, self.guard_start_pos_and_dir.0.1 as i32, self.guard_start_pos_and_dir.1);
+        let mut guard_pos = self.guard_start_pos_and_dir;
+        let mut initial_guard_hash: HashSet<Direction> = HashSet::new();
+        initial_guard_hash.insert(guard_pos.1);
+        guard_views.insert(guard_pos.0, initial_guard_hash);
+        loop {
+            let possible_guard_pos = self.find_next_guard_position(guard_pos);
+            if let Some(a_guard_pos) = possible_guard_pos {
+                if a_guard_pos.1 == guard_pos.1 {
+                    let directions = guard_views.get(&a_guard_pos.0);
+                    let loop_direction = Self::next_direction(a_guard_pos.1);
+                    if let Some(directions) = directions {
+                        if directions.contains(&loop_direction) {
+                            //println!("{:?}", a_guard_pos);
+                            count_of_possible_loops += 1;
+                        }
+                    }
+                }
+                guard_views.entry(a_guard_pos.0).or_insert(HashSet::new());
+                guard_views.entry(a_guard_pos.0).and_modify(|e| { e.insert(a_guard_pos.1); });
+                guard_pos = a_guard_pos;
+            }
+            else {
+                break;
+            }
+        }
+        count_of_possible_loops
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn part1_sample_results_in_41() {
-        const SAMPLE_INPUT: &str = "....#.....
+    const SAMPLE_INPUT: &str = "....#.....
 .........#
 ..........
 ..#.......
@@ -108,7 +151,16 @@ mod tests {
 ........#.
 #.........
 ......#...";
+
+    #[test]
+    fn part1_sample_results_in_41() {
         let day = Day06::new(SAMPLE_INPUT.lines());
         assert_eq!(41, day.part1());
+    }
+
+    #[test]
+    fn part2_sample_results_in_6() {
+        let day = Day06::new(SAMPLE_INPUT.lines());
+        assert_eq!(6, day.part2());
     }
 }
