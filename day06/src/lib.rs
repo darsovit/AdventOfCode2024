@@ -44,7 +44,7 @@ impl Day06 {
         }
     }
 
-    fn calc_next_pos_in_direction(&self, guard_pos: &((usize, usize), Direction)) -> Option<(((usize, usize), Direction), &str)> {
+    fn calc_next_pos_in_direction(&self, guard_pos: &((usize, usize), Direction)) -> Option<((usize, usize), Direction)> {
         let dir_increment = Self::direction_to_increment(guard_pos.1);
 
         let new_position = (guard_pos.0.0 as i32 + dir_increment.0, guard_pos.0.1 as i32 + dir_increment.1);
@@ -53,8 +53,7 @@ impl Day06 {
         }
         else {
             let next_pos = ((new_position.0 as usize, new_position.1 as usize), guard_pos.1);
-            let is_obstacle = self.obstacles.get(&next_pos.0);
-             Some((next_pos, if let None = is_obstacle { "." } else { "#" }))
+            Some(next_pos)
         }
     }
 
@@ -71,14 +70,17 @@ impl Day06 {
     }
     fn find_next_guard_position(&self, guard_pos: ((usize, usize), Direction)) -> Option<((usize, usize), Direction)> {
         let mut cur_guard_pos = guard_pos;
+        let mut loop_count = 0;
         loop {
-            let next_guard_pos_and_item = self.calc_next_pos_in_direction(&cur_guard_pos);
-            if let Some(guard_pos_and_item) = next_guard_pos_and_item {
-                if guard_pos_and_item.1 == "#" {
+            let next_guard_pos = self.calc_next_pos_in_direction(&cur_guard_pos);
+            if let Some(guard_pos) = next_guard_pos {
+                if let Some(_) = self.obstacles.get(&guard_pos.0) {
                     cur_guard_pos = Self::turn_guard(cur_guard_pos);
+                    loop_count += 1;
                 }
                 else {
-                    return Some(guard_pos_and_item.0);
+                    if loop_count == 2 { println!("Had a second turn"); }
+                    return Some(guard_pos);
                 }
             } else {
                 return None;
@@ -108,7 +110,6 @@ impl Day06 {
         let mut count_of_possible_loops = 0;
 
         let mut guard_views: HashMap<(usize, usize), HashSet<Direction>> = HashMap::new();
-        //let mut guard_pos = (self.guard_start_pos_and_dir.0.0 as i32, self.guard_start_pos_and_dir.0.1 as i32, self.guard_start_pos_and_dir.1);
         let mut guard_pos = self.guard_start_pos_and_dir;
         let mut initial_guard_hash: HashSet<Direction> = HashSet::new();
         initial_guard_hash.insert(guard_pos.1);
@@ -121,7 +122,6 @@ impl Day06 {
                     let loop_direction = Self::next_direction(a_guard_pos.1);
                     if let Some(directions) = directions {
                         if directions.contains(&loop_direction) {
-                            //println!("{:?}", a_guard_pos);
                             count_of_possible_loops += 1;
                         }
                     }
