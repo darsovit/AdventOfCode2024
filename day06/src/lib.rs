@@ -65,77 +65,173 @@ impl Day06 {
             Direction::West => Direction::North,
         }
     }
+
     fn turn_guard(guard_pos: ((usize, usize), Direction)) -> ((usize, usize), Direction) {
         (guard_pos.0, Self::next_direction(guard_pos.1))
     }
-    fn find_next_guard_position(&self, guard_pos: ((usize, usize), Direction)) -> Option<((usize, usize), Direction)> {
-        let mut cur_guard_pos = guard_pos;
-        let mut loop_count = 0;
-        loop {
-            let next_guard_pos = self.calc_next_pos_in_direction(&cur_guard_pos);
-            if let Some(guard_pos) = next_guard_pos {
-                if let Some(_) = self.obstacles.get(&guard_pos.0) {
-                    cur_guard_pos = Self::turn_guard(cur_guard_pos);
-                    loop_count += 1;
+
+
+
+    fn is_forward_blocked(&self, guard_pos: &((usize, usize), Direction)) -> Option<bool> {
+        match self.calc_next_pos_in_direction(guard_pos) {
+            None => None,
+            Some(forward_position) => {
+                match self.obstacles.get(&forward_position.0) {
+                    None => Some(false),
+                    Some(_) => Some(true)
                 }
-                else {
-                    if loop_count == 2 { println!("Had a second turn"); }
-                    return Some(guard_pos);
-                }
-            } else {
-                return None;
             }
         }
     }
 
-    pub fn part1(&self) -> usize {
-        let mut guard_views: HashSet<(i32, i32)> = HashSet::new();
-        //let mut guard_pos = (self.guard_start_pos_and_dir.0.0 as i32, self.guard_start_pos_and_dir.0.1 as i32, self.guard_start_pos_and_dir.1);
-        let mut guard_pos = self.guard_start_pos_and_dir;
-        guard_views.insert((guard_pos.0.0 as i32, guard_pos.0.1 as i32));
 
+}
+
+pub fn part1(day: Day06) -> usize {
+    let mut guard_views: HashSet<(i32, i32)> = HashSet::new();
+    //let mut guard_pos = (self.guard_start_pos_and_dir.0.0 as i32, self.guard_start_pos_and_dir.0.1 as i32, self.guard_start_pos_and_dir.1);
+    let mut guard_pos = day.guard_start_pos_and_dir;
+    guard_views.insert((guard_pos.0.0 as i32, guard_pos.0.1 as i32));
+
+    loop {
+        match day.is_forward_blocked(&guard_pos) {
+            None => { break; },
+            Some(true) => { guard_pos = (guard_pos.0, Day06::next_direction(guard_pos.1)); }
+            Some(false) => {
+                if let Some(a_guard_pos) = day.calc_next_pos_in_direction(&guard_pos) {
+                    guard_views.insert((a_guard_pos.0.0 as i32, a_guard_pos.0.1 as i32));
+                    guard_pos = a_guard_pos;
+                }
+            }
+        }
+    }
+    guard_views.len()
+}
+
+struct Day06p2<'a> {
+    day: &'a Day06,
+    guard_past_state: HashMap<(usize, usize), HashSet<Direction>>,
+    added_obstacle: (usize, usize),
+}
+
+impl<'a> Day06p2<'a> {
+    pub fn new(day06: &'a Day06, guard_past_state: &HashMap<(usize, usize), HashSet<Direction>>, added_obstacle: (usize, usize)) -> Self {
+        Day06p2{day: day06, guard_past_state: guard_past_state.clone(), added_obstacle}
+    }
+
+    fn calc_next_pos_in_direction(&self, guard_pos: &((usize, usize), Direction)) -> Option<((usize, usize), Direction)> {
+        self.day.calc_next_pos_in_direction(guard_pos)
+    }
+
+    fn check_for_guard_visited_already(guard_views: &HashMap<(usize, usize), HashSet<Direction>>, guard_pos: ((usize, usize), Direction)) -> bool {
+        match guard_views.get(&guard_pos.0) {
+            None => false,
+            Some(directions) => {
+                match directions.get(&guard_pos.1) {
+                    None => false,
+                    Some(_) => true
+                }
+            }
+        }
+    }
+
+
+    fn check_for_direct_loop_if_obstacle_added(guard_views: &HashMap<(usize, usize), HashSet<Direction>>, guard_pos: ((usize, usize), Direction)) -> bool {
+        Self::check_for_guard_visited_already(guard_views, (guard_pos.0, Day06::next_direction(guard_pos.1)))
+    }
+
+    fn is_forward_blocked(&self, guard_pos: &((usize, usize), Direction)) -> Option<bool> {
+        match self.day.is_forward_blocked(&guard_pos) {
+            None => None,
+            Some(true) => Some(true),
+            Some(false) => Some(guard_pos.0 == self.added_obstacle)
+        }
+    }
+
+    fn check_for_deep_loop(&self, guard_pos: &((usize, usize), Direction)) -> bool {
+        let mut guard_views = self.guard_past_state.clone();
+        let mut guard_pos = *guard_pos;
         loop {
-            let possible_guard_pos = self.find_next_guard_position(guard_pos);
-            if let Some(a_guard_pos) = possible_guard_pos {
-                guard_views.insert((a_guard_pos.0.0 as i32, a_guard_pos.0.1 as i32));
-                guard_pos = a_guard_pos;
-            } else {
+            match self.is_forward_blocked(&guard_pos) {
+                None => {
+                    // End condition and no loop, because the guard has walked off the map
+                    return false;
+                },
+                Some(true) => {
+                    // Guard has to turn
+                    guard_pos = Day06::turn_guard(guard_pos);
+                    add_to_guard_visited(&mut guard_views, &guard_pos);
+                },
+                Some(false) => {
+                    // Check if we take a step forward, if it has already been visited, if so, loop found, otherwise continue
+                    let forward_step = self.day.calc_next_pos_in_direction(&guard_pos).unwrap();
+                    if Self::check_for_guard_visited_already(&guard_views, forward_step) {
+                        return true;
+                    }
+                    add_to_guard_visited(&mut guard_views, &forward_step);
+                    guard_pos = forward_step;
+                }
+            }
+        }
+    }
+
+}
+
+fn is_forward_available_for_obstacle_positioning(day: &Day06, guard_views: &HashMap<(usize, usize), HashSet<Direction>>, guard_pos: &((usize, usize), Direction)) -> bool {
+    let forward_pos = day.calc_next_pos_in_direction(guard_pos);
+    match forward_pos {
+        None => false,
+        Some(position) => {
+            let has_guard_visited = if let Some(_) = guard_views.get(&position.0) { true } else { false };
+            let has_obstacle = if let Some(_) = day.obstacles.get(&position.0) { true } else { false };
+            !has_guard_visited && !has_obstacle
+        }
+    }
+}
+
+fn add_to_guard_visited(guard_views: &mut HashMap<(usize, usize), HashSet<Direction>>, guard_pos: &((usize, usize), Direction)) {
+    let create_new_direction_set = || -> HashSet<Direction> {
+        let mut initial_hash = HashSet::<Direction>::new();
+        initial_hash.insert(guard_pos.1);
+        initial_hash
+    };
+
+    guard_views.entry(guard_pos.0).and_modify(|values| { values.insert(guard_pos.1); }).or_insert_with(create_new_direction_set);
+}
+
+
+pub fn part2(day06: Day06) -> u32 {
+    let mut count_of_possible_loops = 0;
+    let mut guard_views: HashMap<(usize, usize), HashSet<Direction>> = HashMap::new();
+    let mut guard_pos = day06.guard_start_pos_and_dir;
+    add_to_guard_visited(&mut guard_views, &guard_pos);
+
+    loop {
+        match day06.is_forward_blocked(&guard_pos) {
+            None => {
+                println!("Next from {:?} is off", guard_pos); 
                 break;
             }
-        }
-        guard_views.len()
-    }
-
-    pub fn part2(&self) -> u32 {
-        let mut count_of_possible_loops = 0;
-
-        let mut guard_views: HashMap<(usize, usize), HashSet<Direction>> = HashMap::new();
-        let mut guard_pos = self.guard_start_pos_and_dir;
-        let mut initial_guard_hash: HashSet<Direction> = HashSet::new();
-        initial_guard_hash.insert(guard_pos.1);
-        guard_views.insert(guard_pos.0, initial_guard_hash);
-        loop {
-            let possible_guard_pos = self.find_next_guard_position(guard_pos);
-            if let Some(a_guard_pos) = possible_guard_pos {
-                if a_guard_pos.1 == guard_pos.1 {
-                    let directions = guard_views.get(&a_guard_pos.0);
-                    let loop_direction = Self::next_direction(a_guard_pos.1);
-                    if let Some(directions) = directions {
-                        if directions.contains(&loop_direction) {
-                            count_of_possible_loops += 1;
-                        }
+            Some(true) => {
+                guard_pos = Day06::turn_guard(guard_pos);
+                add_to_guard_visited(&mut guard_views, &guard_pos);
+                println!("Forward was blocked, turned to {:?}", guard_pos);
+            },
+            Some(false) => {
+                let forward_step = day06.calc_next_pos_in_direction(&guard_pos).unwrap();
+                if is_forward_available_for_obstacle_positioning(&day06, &guard_views, &guard_pos) {
+                    println!("Testing for additional block introucing loop at {:?}", forward_step);
+                    let day = Day06p2::new(&day06, &guard_views, forward_step.0);
+                    if day.check_for_deep_loop(&guard_pos) {
+                        count_of_possible_loops += 1;
                     }
                 }
-                guard_views.entry(a_guard_pos.0).or_insert(HashSet::new());
-                guard_views.entry(a_guard_pos.0).and_modify(|e| { e.insert(a_guard_pos.1); });
-                guard_pos = a_guard_pos;
-            }
-            else {
-                break;
+                add_to_guard_visited(&mut guard_views, &forward_step);
+                guard_pos = forward_step;
             }
         }
-        count_of_possible_loops
     }
+    count_of_possible_loops
 }
 
 #[cfg(test)]
@@ -155,12 +251,12 @@ mod tests {
     #[test]
     fn part1_sample_results_in_41() {
         let day = Day06::new(SAMPLE_INPUT.lines());
-        assert_eq!(41, day.part1());
+        assert_eq!(41, part1(day));
     }
 
     #[test]
     fn part2_sample_results_in_6() {
         let day = Day06::new(SAMPLE_INPUT.lines());
-        assert_eq!(6, day.part2());
+        assert_eq!(6, part2(day));
     }
 }
