@@ -23,7 +23,7 @@ impl Day07 {
         Day07{equations}
     }
 
-    fn parts_can_total_sum(sum: u64, current_value: u64, parts_left: &[u64]) -> bool {
+    fn parts_can_total_sum(sum: u64, current_value: u64, parts_left: &[u64], operators: &Vec<fn(u64, u64)->u64>) -> bool {
         if current_value > sum {
             false
         }
@@ -31,16 +31,33 @@ impl Day07 {
             current_value == sum
         }
         else {
-            let next_part_multiplied_works = Self::parts_can_total_sum(sum, current_value * parts_left[0], &parts_left[1..]);
-            let next_part_added_works = Self::parts_can_total_sum(sum, current_value + parts_left[0], &parts_left[1..]);
-            next_part_multiplied_works || next_part_added_works
+            for operator in operators {
+                let operator_works = Self::parts_can_total_sum(sum, operator(current_value, parts_left[0]), &parts_left[1..], operators);
+                if operator_works { return true; }
+            }
+            return false;
         }
     }
 
+    fn multiplication(a: u64, b: u64) -> u64 { a * b }
+    fn addition(a: u64, b: u64) -> u64 { a + b }
+    fn concat(a: u64, b: u64) -> u64 {
+        format!("{}{}", a, b).parse::<u64>().unwrap()
+    }
     pub fn part1(&self) -> u64 {
         let mut sum = 0;
         for equation in &self.equations[..] {
-            if Self::parts_can_total_sum(equation.sum, equation.parts[0], &(equation.parts[1..])) {
+            if Self::parts_can_total_sum(equation.sum, equation.parts[0], &(equation.parts[1..]), &vec![Self::addition, Self::multiplication]) {
+                sum += equation.sum;
+            }
+        }
+        sum
+    }
+
+    pub fn part2(&self) -> u64 {
+        let mut sum = 0;
+        for equation in &self.equations[..] {
+            if Self::parts_can_total_sum(equation.sum, equation.parts[0], &(equation.parts[1..]), &vec![Self::addition, Self::multiplication, Self::concat]) {
                 sum += equation.sum;
             }
         }
@@ -65,5 +82,11 @@ mod tests {
     fn sample_with_part1_is_3749() {
         let day = Day07::new(SAMPLE_LINES.lines());
         assert_eq!(3749, day.part1());
+    }
+
+    #[test]
+    fn sample_with_part2_is_11387() {
+        let day = Day07::new(SAMPLE_LINES.lines());
+        assert_eq!(11387, day.part2());
     }
 }
