@@ -1,8 +1,8 @@
 use regex::Regex;
 
 struct EquationParts {
-    sum: u32,
-    parts: Vec<u32>,
+    sum: u64,
+    parts: Vec<u64>,
 }
 
 pub struct Day07 {
@@ -12,21 +12,37 @@ pub struct Day07 {
 impl Day07 {
     pub fn new(lines: std::str::Lines<'_>) -> Self {
         let mut equations: Vec<EquationParts> = Vec::new();
-        let equation_regex = Regex::new(r"(?<sum>\d+): (?<parts>(\d+ )\d+)").unwrap();
+        let equation_regex = Regex::new(r"^(?<sum>\d+): (?<parts>(\d+ )+\d+)$").unwrap();
         for line in lines {
             if let Some(captures) = equation_regex.captures(line) {
-                let parts = captures["parts"].split(" ").map(|e| e.parse::<u32>().unwrap()).collect();
-                let sum = captures["sum"].parse::<u32>().unwrap();
+                let parts = captures["parts"].split(" ").map(|e| e.parse::<u64>().unwrap()).collect();               
+                let sum = captures["sum"].parse::<u64>().unwrap();
                 equations.push(EquationParts{sum, parts});
             }
         }
         Day07{equations}
     }
 
-    pub fn part1(&self) -> u32 {
+    fn parts_can_total_sum(sum: u64, current_value: u64, parts_left: &[u64]) -> bool {
+        if current_value > sum {
+            false
+        }
+        else if parts_left.len() == 0 {
+            current_value == sum
+        }
+        else {
+            let next_part_multiplied_works = Self::parts_can_total_sum(sum, current_value * parts_left[0], &parts_left[1..]);
+            let next_part_added_works = Self::parts_can_total_sum(sum, current_value + parts_left[0], &parts_left[1..]);
+            next_part_multiplied_works || next_part_added_works
+        }
+    }
+
+    pub fn part1(&self) -> u64 {
         let mut sum = 0;
         for equation in &self.equations[..] {
-            println!("{:?} = {:?}", equation.sum, equation.parts);
+            if Self::parts_can_total_sum(equation.sum, equation.parts[0], &(equation.parts[1..])) {
+                sum += equation.sum;
+            }
         }
         sum
     }
