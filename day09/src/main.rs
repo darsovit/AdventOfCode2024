@@ -12,7 +12,6 @@ fn main() {
             println!("part1: {}", day.part1());
             let day = Day09p2::new(lines[0]);
             println!("part2: {}", day.part2());
-            println!("part2: 8247886475562 is too high");
         },
         Err(e) => { println!("Error reading file: {}, {:?}", DATAFILE, e); }
     }

@@ -153,15 +153,15 @@ impl Day09p2 {
     }
 
     fn find_best_free_space(space_needed: usize, file_sectors_start: usize, free_list_sizes: &mut HashMap<usize, BinaryHeap<Reverse<usize>>>) -> Option<usize> {
-        let mut furthest_left_smallest_free_list_size: Option<(usize, usize)> = None;
-        for spaces in space_needed..9 {
+        let mut furthest_left_fit_list_size: Option<(usize, usize)> = None;
+        for spaces in space_needed..10 {
             if let Some(free_list) = free_list_sizes.get(&spaces) {
                 if let Some(Reverse(left_most_of_size)) = free_list.peek() {
-                    match furthest_left_smallest_free_list_size {
-                        None => { furthest_left_smallest_free_list_size = Some((*left_most_of_size, spaces)); }
+                    match furthest_left_fit_list_size {
+                        None => { furthest_left_fit_list_size = Some((*left_most_of_size, spaces)); }
                         Some((left_spot, _)) => {
                             if *left_most_of_size < left_spot {
-                                furthest_left_smallest_free_list_size = Some((*left_most_of_size, spaces));
+                                furthest_left_fit_list_size = Some((*left_most_of_size, spaces));
                             }
                         }
                     }
@@ -169,7 +169,7 @@ impl Day09p2 {
                 }
             }
         }
-        match furthest_left_smallest_free_list_size {
+        match furthest_left_fit_list_size {
             None => None,
             Some((left_spot, size_free_list)) => { if file_sectors_start > left_spot { Some(size_free_list) } else { None } }
         }
