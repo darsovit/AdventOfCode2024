@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 use std::collections::HashMap;
+use std::collections::BinaryHeap;
+use std::cmp::Reverse;
 
 pub struct Day09 {
     free_list: VecDeque<usize>,
@@ -109,6 +111,111 @@ impl Day09 {
     }
 }
 
+pub struct Day09p2 {
+    free_list: HashMap<usize, BinaryHeap<Reverse<usize>>>,
+    file_list: HashMap<usize, Vec<usize>>,
+    sector_list: Vec<Option<usize>>,
+    largest_file_id: usize,
+}
+
+impl Day09p2 {
+    pub fn new(line: &str) -> Self {
+        let mut file_id: usize = 0;
+        let mut disk_sector: usize = 0;
+        let mut free_list = HashMap::<usize, BinaryHeap::<Reverse<usize>>>::new();
+        let mut file_list = HashMap::<usize, Vec<usize>>::new();
+        let mut sector_list = Vec::<Option<usize>>::new();
+
+        for (index, a_char) in line.chars().enumerate() {
+            let num_blocks = determine_num_blocks(a_char).unwrap();
+            if index % 2 == 0 {
+                let mut file_sector_list = Vec::<usize>::new();
+                for sector_id in disk_sector..disk_sector+num_blocks {
+                    file_sector_list.push(sector_id);
+                }
+                file_list.insert(file_id, file_sector_list);
+                for _i in 0..num_blocks {
+                    sector_list.push(Some(file_id));
+                }
+                file_id += 1;
+                disk_sector += num_blocks;
+            }
+            else {
+                free_list.entry(num_blocks).or_insert(BinaryHeap::new()).push(Reverse(disk_sector));
+                for _i in 0..num_blocks {
+                    sector_list.push(None);
+                }
+                disk_sector += num_blocks;
+            }
+            assert_eq!(disk_sector, sector_list.len());
+        }
+        Day09p2{free_list, file_list, sector_list, largest_file_id: file_id}
+    }
+
+    fn find_best_free_space(space_needed: usize, file_sectors_start: usize, free_list_sizes: &mut HashMap<usize, BinaryHeap<Reverse<usize>>>) -> Option<usize> {
+        let mut furthest_left_smallest_free_list_size: Option<(usize, usize)> = None;
+        for spaces in space_needed..9 {
+            if let Some(free_list) = free_list_sizes.get(&spaces) {
+                if let Some(Reverse(left_most_of_size)) = free_list.peek() {
+                    match furthest_left_smallest_free_list_size {
+                        None => { furthest_left_smallest_free_list_size = Some((*left_most_of_size, spaces)); }
+                        Some((left_spot, _)) => {
+                            if *left_most_of_size < left_spot {
+                                furthest_left_smallest_free_list_size = Some((*left_most_of_size, spaces));
+                            }
+                        }
+                    }
+                    
+                }
+            }
+        }
+        match furthest_left_smallest_free_list_size {
+            None => None,
+            Some((left_spot, size_free_list)) => { if file_sectors_start > left_spot { Some(size_free_list) } else { None } }
+        }
+    }
+    fn try_move_file(file_id: usize, file_sectors: &mut Vec<usize>, sector_list: &mut Vec<Option<usize>>, free_list: &mut HashMap<usize, BinaryHeap<Reverse<usize>>>) {
+        if let Some(free_entry_size) = Self::find_best_free_space(file_sectors.len(), file_sectors[0], free_list) {
+            if let Some(Reverse(free_list_start)) = free_list.get_mut(&free_entry_size).unwrap().pop() {
+                for sector in &file_sectors[..] {
+                    if let Some(sector_file_id) = sector_list[*sector] {
+                        assert_eq!(sector_file_id, file_id);
+                        sector_list[*sector] = None;
+                    }
+                }
+                for (index, sector) in file_sectors.iter_mut().enumerate() {
+                    *sector = free_list_start + index;
+                }
+                if free_entry_size > file_sectors.len() {
+                    let free_entry_left = free_entry_size - file_sectors.len();
+                    let new_free_list_start = free_list_start + file_sectors.len();
+                    free_list.entry(free_entry_left).or_insert(BinaryHeap::new()).push(Reverse(new_free_list_start));
+                }
+            }
+        }
+    }
+
+    pub fn part2(&self) -> usize {
+        let mut free_list = self.free_list.clone();
+        let mut sector_list = self.sector_list.clone();
+        let mut file_list = self.file_list.clone();
+
+        for id in (1..self.largest_file_id).rev() {
+            Self::try_move_file(id, &mut file_list.get_mut(&id).unwrap(), &mut sector_list, &mut free_list);
+        }
+
+        let mut checksum = 0;
+        for file in file_list {
+            let mut sector_id_sum = 0;
+            for sector_id in file.1 {
+                sector_id_sum += sector_id;
+            }
+            checksum += file.0 * sector_id_sum;
+        }
+        checksum
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,5 +224,11 @@ mod tests {
     fn sample_input_part1_is_1928() {
         let day = Day09::new(SAMPLE_LINE);
         assert_eq!(1928, day.part1());
+    }
+
+    #[test]
+    fn sample_input_part2_is_2858() {
+        let day = Day09p2::new(SAMPLE_LINE);
+        assert_eq!(2858, day.part2());
     }
 }

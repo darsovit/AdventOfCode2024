@@ -1,5 +1,6 @@
 use std::fs;
 use day09::Day09;
+use day09::Day09p2;
 
 fn main() {
     const DATAFILE: &str = "input.txt";
@@ -9,7 +10,9 @@ fn main() {
             let lines: Vec<_> = line_content.lines().collect();
             let day = Day09::new(lines[0]);
             println!("part1: {}", day.part1());
-            //println!("part2: {}", day.part2());
+            let day = Day09p2::new(lines[0]);
+            println!("part2: {}", day.part2());
+            println!("part2: 8247886475562 is too high");
         },
         Err(e) => { println!("Error reading file: {}, {:?}", DATAFILE, e); }
     }
