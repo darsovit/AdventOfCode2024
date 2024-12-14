@@ -61,7 +61,7 @@ impl Day10 {
         if next_target == 10 {
             peaks_found.insert(pos);
         }
-        let mut score = 0;
+
         for neighbor in self.neighbor_list(pos) {
             if let Some((yindex, xindex)) = neighbor {
                 if self.topography[yindex][xindex] == next_target {
@@ -84,6 +84,33 @@ impl Day10 {
         }
         sum_of_trailhead_scores
     }
+
+    fn count_gradual_climbs_to_peaks(&self, pos: (usize, usize), next_target: i8) -> usize {
+        if next_target == 10 {
+            return 1;
+        }
+        let mut rating: usize = 0;
+        for neighbor in self.neighbor_list(pos) {
+            if let Some((yindex, xindex)) = neighbor {
+                if self.topography[yindex][xindex] == next_target {
+                    rating += self.count_gradual_climbs_to_peaks((yindex, xindex), next_target+1);
+                }
+            }
+        }
+        rating
+    }
+
+    fn rate_trailhead(&self, trailhead: (usize, usize)) -> usize {
+        self.count_gradual_climbs_to_peaks(trailhead, 1)
+    }
+
+    pub fn part2(&self) -> usize {
+        let mut sum_of_trailhead_ratings = 0;
+        for trailhead in &self.trailheads {
+            sum_of_trailhead_ratings += self.rate_trailhead(*trailhead);
+        }
+        sum_of_trailhead_ratings
+    }
 }
 
 #[cfg(test)]
@@ -101,9 +128,7 @@ mod tests {
         assert_eq!(1, day.part1());
     }
 
-    #[test]
-    fn part1_larger_sample_is_36() {
-        const SAMPLE_LINES: &str =
+    const LARGER_SAMPLE_LINES: &str =
 "89010123
 78121874
 87430965
@@ -112,7 +137,16 @@ mod tests {
 32019012
 01329801
 10456732";
-        let day = Day10::new(SAMPLE_LINES.lines());
+
+    #[test]
+    fn part1_larger_sample_is_36() {
+        let day = Day10::new(LARGER_SAMPLE_LINES.lines());
         assert_eq!(36, day.part1());
+    }
+
+    #[test]
+    fn part2_larger_sample_is_81() {
+        let day = Day10::new(LARGER_SAMPLE_LINES.lines());
+        assert_eq!(81, day.part2());
     }
 }
