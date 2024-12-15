@@ -9,7 +9,7 @@ fn main() {
             let lines: Vec<_> = line_content.lines().collect();
             let day = Day11::new(lines[0]);
             println!("part1: {}", day.part1());
-            //println!("part2: {}", day.part2());
+            println!("part2: {}", day.part2());
         },
         Err(e) => { println!("Error reading file: {}, {:?}", DATAFILE, e); }
     }

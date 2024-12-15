@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub struct Day11 {
     stones: Vec<u64>
 }
@@ -39,8 +41,45 @@ impl Day11 {
         Self::blink_n_times(&self.stones, 25).len()
     }
 
-    pub fn part2(&self) -> usize {
-        0
+    fn count_num_of_stone_values(stones: &Vec<u64>) -> HashMap<u64, u64> {
+        let mut stone_num_to_count: HashMap<u64, u64> = HashMap::new();
+        for stone in stones {
+            stone_num_to_count.entry(*stone).and_modify(|v| *v += 1).or_insert(1);
+        }
+        stone_num_to_count
+    }
+    
+    pub fn part2(&self) -> u64 {
+        // we need to repeat 75 times
+        // we don't care about the actual order of the stones
+        let answer_to_25 = Self::blink_n_times(&self.stones, 25);
+        let stone_num_to_count_answer_to_25 = Self::count_num_of_stone_values(&answer_to_25);
+
+        let mut cache25: HashMap<u64, HashMap<u64, u64>> = HashMap::new();
+        let mut answer_to_50: HashMap<u64, u64> = HashMap::new();
+
+        for (stone_num, count) in stone_num_to_count_answer_to_25 {
+            let result = cache25.entry(stone_num).or_insert(Self::count_num_of_stone_values(&Self::blink_n_times(&vec![stone_num], 25)));
+            for (result_stone, result_count) in result {
+                let val = answer_to_50.entry(*result_stone).or_insert(0);
+                *val += *result_count * count;
+            }
+        }
+
+        let mut answer_to_75: HashMap<u64, u64> = HashMap::new();
+        for (stone_num, count) in answer_to_50 {
+            let result = cache25.entry(stone_num).or_insert(Self::count_num_of_stone_values(&Self::blink_n_times(&vec![stone_num], 25)));
+            for (result_stone, result_count) in result {
+                let val = answer_to_75.entry(*result_stone).or_insert(0);
+                *val += *result_count * count;
+            }
+        }
+
+        let mut num_stones_in_75: u64 = 0;
+        for (stone_num, count) in answer_to_75 {
+            num_stones_in_75 += count;
+        }
+        num_stones_in_75
     }
 }
 
