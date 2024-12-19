@@ -48,8 +48,8 @@ impl Day13 {
         // A.1 * X - (B.1/B.0) * A.0 * X = (C.1 - C.0 * (B.1/B.0))
         // X * (A.1 - (B.1/B.0) * A.0) = (C.1 - C.0 * (B.1/B.0))
         // X = (C.1 - C.0 * (B.1/B.0)) / (A.1 - (B.1/B.0) * A.0)
-        let b_ratio: f32 = claw_machine.button_b.1 as f32 / claw_machine.button_b.0 as f32;
-        let a_mult: f32 = (claw_machine.prize.1 as f32 - b_ratio * claw_machine.prize.0 as f32) / (claw_machine.button_a.1 as f32 - b_ratio * claw_machine.button_a.0 as f32);
+        let b_ratio: f64 = claw_machine.button_b.1 as f64 / claw_machine.button_b.0 as f64;
+        let a_mult: f64 = (claw_machine.prize.1 as f64 - b_ratio * claw_machine.prize.0 as f64) / (claw_machine.button_a.1 as f64 - b_ratio * claw_machine.button_a.0 as f64);
 
         let a_mult_rounded = a_mult.round() as i64;
 
@@ -72,14 +72,14 @@ impl Day13 {
         // B.1 * Y - B.0 * (A.1 / A.0) * Y = C.1 - C.0 * (A.1/A.0)
         // (B.1 - B.0 * (A.1 / A.0)) * Y = (C.1 - C.0 * (A.1 / A.0))
         // Y = (C.1 - C.0 * (A.1 / A.0)) / (B.1 - B.0 * (A.1 / A.0))
-        let a_ratio: f32 = claw_machine.button_a.1 as f32 / claw_machine.button_a.0 as f32;
-        let b_mult: f32 = (claw_machine.prize.1 as f32 - a_ratio * claw_machine.prize.0 as f32) / (claw_machine.button_b.1 as f32 - claw_machine.button_b.0 as f32 * a_ratio);
+        let a_ratio: f64 = claw_machine.button_a.1 as f64 / claw_machine.button_a.0 as f64;
+        let b_mult: f64 = (claw_machine.prize.1 as f64 - a_ratio * claw_machine.prize.0 as f64) / (claw_machine.button_b.1 as f64 - claw_machine.button_b.0 as f64 * a_ratio);
 
         // A.0 * X + B.0 * Y = C.0
         // X = (C.0 - B.0 * Y) / A.0
-        let a_mult: f32 = (claw_machine.prize.0 as f32 - b_mult * claw_machine.button_b.0 as f32) / claw_machine.button_a.0 as f32;
+        let a_mult: f64 = (claw_machine.prize.0 as f64 - b_mult * claw_machine.button_b.0 as f64) / claw_machine.button_a.0 as f64;
 
-        match ((a_mult as i64) as f32 == a_mult && a_mult as i64 >= 0, (b_mult as i64) as f32 == b_mult && b_mult as i64 >= 0) {
+        match ((a_mult as i64) as f64 == a_mult && a_mult as i64 >= 0, (b_mult as i64) as f64 == b_mult && b_mult as i64 >= 0) {
             (true, true) => Some((a_mult as i64, b_mult as i64)),
             (_, _) => None
         }
@@ -107,15 +107,15 @@ impl Day13 {
         // (B.1 - B.0 * (A.1 / A.0)) * Y = (C.1 - C.0 * (A.1 / A.0))
         // Y = (C.1 - C.0 * (A.1 / A.0)) / (B.1 - B.0 * (A.1 / A.0))
         /* 
-        let a_ratio: f32 = claw_machine.button_a.1 as f32 / claw_machine.button_a.0 as f32;
-        let b_mult: f32 = (claw_machine.prize.1 as f32 - a_ratio * claw_machine.prize.0 as f32) / (claw_machine.button_b.1 as f32 - claw_machine.button_b.0 as f32 * a_ratio);
+        let a_ratio: f64 = claw_machine.button_a.1 as f64 / claw_machine.button_a.0 as f64;
+        let b_mult: f64 = (claw_machine.prize.1 as f64 - a_ratio * claw_machine.prize.0 as f64) / (claw_machine.button_b.1 as f64 - claw_machine.button_b.0 as f64 * a_ratio);
 
         // A.0 * X + B.0 * Y = C.0
         // X = (C.0 - B.0 * Y) / A.0
-        let a_mult: f32 = (claw_machine.prize.0 as f32 - b_mult * claw_machine.button_b.0 as f32) / claw_machine.button_a.0 as f32;
+        let a_mult: f64 = (claw_machine.prize.0 as f64 - b_mult * claw_machine.button_b.0 as f64) / claw_machine.button_a.0 as f64;
         println!("A Button presses: {}, B Button Presses: {}", a_mult, b_mult);
 
-        match ((a_mult as i64) as f32 == a_mult, (b_mult as i64) as f32 == b_mult) {
+        match ((a_mult as i64) as f64 == a_mult, (b_mult as i64) as f64 == b_mult) {
             (true, true) => Some(((a_mult as i64, b_mult as i64), a_mult as i64 * costs.0 + b_mult as i64 * costs.1)),
             (_, _) => None
         }
@@ -129,6 +129,18 @@ impl Day13 {
                 assert!(_a_mult <= 100);
                 assert!(_b_mult <= 100);
                 assert!(cost > 0);
+                sum_of_costs += cost;
+            }
+        }
+        sum_of_costs
+    }
+
+    pub fn part2(&self) -> i64 {
+        let mut sum_of_costs = 0;
+        const PRIZE_ADDED_DISTANCE: i64 = 10000000000000;
+        for claw_machine in &self.claw_machines {
+            let corrected_claw_machine = ClawMachine{button_a: claw_machine.button_a, button_b: claw_machine.button_b, prize: (PRIZE_ADDED_DISTANCE + claw_machine.prize.0, PRIZE_ADDED_DISTANCE + claw_machine.prize.1)};
+            if let Some(((_a_mult, _b_mult), cost)) = Self::find_solution_and_cost(&corrected_claw_machine, (3, 1)) {
                 sum_of_costs += cost;
             }
         }
