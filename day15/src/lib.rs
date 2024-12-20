@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 pub struct Day15 {
     map: Vec<Vec<char>>,
     robot_pos: (usize, usize),
@@ -216,21 +218,16 @@ impl Day15 {
                 if !Self::move_up_range(map, &ranges_to_move) { return false; }
             }
 
-            /*
-            all_space = true;
-            let items_at_needed_positions = Self::get_items_above_ranges_to_move(map, ranges_to_move);
-            for items in items_at_needed_positions {
-                for item in items.0 {
-                    if item != '.' { all_space = false; }
-                }
-            }
-
-            if !all_space { return false; } // higher level couldn't move everything necessary
-*/
+            let mut moved_xindex = HashSet::<usize>::new();
             for range_to_move in &ranges_to_move.1 {
                 for xindex in range_to_move.0..range_to_move.1 {
-                    map[cur_y-1][xindex] = map[cur_y][xindex];
-                    map[cur_y][xindex] = '.';
+                    if let None = moved_xindex.get(&xindex) {
+                        moved_xindex.insert(xindex);
+                        assert_eq!('.', map[cur_y-1][xindex]);
+                        assert!(map[cur_y][xindex] == '[' || map[cur_y][xindex] == ']');
+                        map[cur_y-1][xindex] = map[cur_y][xindex];
+                        map[cur_y][xindex] = '.';
+                    }
                 }
             }
             return true;
@@ -247,7 +244,7 @@ impl Day15 {
             for items in &items_at_needed_positions {
                 for item in items.0 {
                     if *item == '#' { return false; } // can't push up, we're blocked
-                    if *item != '.' { all_space = false; } // can't push up til we push up above us
+                    if *item != '.' { assert!(*item == '[' || *item == ']'); all_space = false; } // can't push up til we push up above us
                 }
             }
 
@@ -256,10 +253,16 @@ impl Day15 {
                 if !Self::move_down_range(map, &ranges_to_move) { return false; }
             }
 
+            let mut moved_xindex = HashSet::<usize>::new();
             for range_to_move in &ranges_to_move.1 {
                 for xindex in range_to_move.0..range_to_move.1 {
-                    map[cur_y+1][xindex] = map[cur_y][xindex];
-                    map[cur_y][xindex] = '.';
+                    if let None = moved_xindex.get(&xindex) {
+                        moved_xindex.insert(xindex);
+                        assert_eq!('.', map[cur_y+1][xindex]);
+                        assert!(map[cur_y][xindex] == '[' || map[cur_y][xindex] == ']');
+                        map[cur_y+1][xindex] = map[cur_y][xindex];
+                        map[cur_y][xindex] = '.';
+                    }
                 }
             }
             return true;
@@ -310,7 +313,7 @@ impl Day15 {
     pub fn part2(&self) -> usize {
         let mut map = self.map.clone();
         let mut robot_pos: (usize, usize) = self.robot_pos;
-
+        let debug = false;
         for direction in &self.directions {
             match direction {
                 '^' => { Self::move_up_wide(&mut map, &mut robot_pos); },
@@ -318,6 +321,15 @@ impl Day15 {
                 'v' => { Self::move_down_wide(&mut map, &mut robot_pos); },
                 '<' => { Self::move_left(&mut map, &mut robot_pos); },
                 something_else => { panic!("Invalid direction: {}", something_else); }
+            }
+            if debug {
+                println!("After: {direction}:");
+                for row in &map {
+                    for a_char in row {
+                        print!("{a_char}");
+                    }
+                    println!("");
+                }
             }
         }
 
