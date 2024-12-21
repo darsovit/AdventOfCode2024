@@ -259,39 +259,56 @@ fn get_backwards_tile(pos: (usize, usize), dir: &Direction) -> (usize, usize) {
 }
 fn count_num_tiles_walking_back_best_paths(day: &Day16, best_cost: usize, visited_loc_costs: &HashMap<((usize, usize), MajorDirection), (Direction, usize)>) -> usize {
     let mut sum_of_num_tiles = 0;
-    let mut tiles_on_backwards_paths = VecDeque::<((usize, usize), usize)>::new();
+    let mut tiles_on_backwards_paths = VecDeque::<((usize, usize), (usize, usize))>::new();
     let mut tiles_on_best_paths = HashSet::<(usize, usize)>::new();
-    let mut cur_cost = best_cost % 1000;
-    tiles_on_backwards_paths.push_back((day.end, best_cost));
+    let mut cur_step_cost = best_cost % 1000;
+    tiles_on_backwards_paths.push_back((day.end, (best_cost % 1000, best_cost / 1000)));
 
     while tiles_on_backwards_paths.len() > 0 {
         let (pos, cost) = tiles_on_backwards_paths.pop_front().unwrap();
-        tiles_on_best_paths.insert(pos);
-        assert!(cost % 1000 == cur_cost || cost % 1000 == cur_cost - 1);
-        cur_cost = cost % 1000;
+        if let None = tiles_on_best_paths.get(&pos) {
+            tiles_on_best_paths.insert(pos);
+            assert!(cost.0 == cur_step_cost || cost.0 == cur_step_cost - 1);
+            cur_step_cost = cost.0;
 
-        if cur_cost > 0 {
-            match (visited_loc_costs.get(&(pos, MajorDirection::NorthSouth)), visited_loc_costs.get(&(pos, MajorDirection::EastWest))) {
-                (Some((dir1, cost1)), Some((dir2, cost2))) => {
-                    if *cost1 % 1000 == cur_cost {
-                        tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir1), cur_cost - 1));
+            if cur_step_cost > 0 {
+                match (visited_loc_costs.get(&(pos, MajorDirection::NorthSouth)), visited_loc_costs.get(&(pos, MajorDirection::EastWest))) {
+                    (Some((dir1, cost1)), Some((dir2, cost2))) => {
+                        //println!("pos: {:?}, cost: {:?}, cost1: {cost1}, dir1: {:?}, cost2: {cost2}, dir2: {:?}", pos, cost, dir1, dir2);
+                        if *cost1 % 1000 == cur_step_cost && *cost1 / 1000 <= cost.1 {
+                            tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir1), (cur_step_cost - 1, cost1 / 1000)));
+                        }
+                        if *cost2 % 1000 == cur_step_cost && *cost2 / 1000 <= cost.1 {
+                            tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir2), (cur_step_cost - 1, cost1 / 1000)));
+                        }
+                    },
+                    (Some((dir1, cost1)), None) => {
+                        assert_eq!(*cost1 % 1000, cur_step_cost);
+                        tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir1), (cur_step_cost - 1, cost1 / 1000)));
+                    },
+                    (None, Some((dir2, cost2))) => {
+                        assert_eq!(*cost2 % 1000, cur_step_cost);
+                        tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir2), (cur_step_cost - 1, cost2 / 1000)));
+                    },
+                    (None, None) => {
+                        /* Nothing to do if no tile this direction */
                     }
-                    if *cost2 % 1000 == cur_cost {
-                        tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir2), cur_cost - 1));
-                    }
-                },
-                (Some((dir1, cost1)), None) => {
-                    assert_eq!(*cost1 % 1000, cur_cost);
-                    tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir1), cur_cost - 1));
-                },
-                (None, Some((dir2, cost2))) => {
-                    assert_eq!(*cost2 % 1000, cur_cost);
-                    tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir2), cur_cost - 1));
-                },
-                (None, None) => {
-                    /* Nothing to do if no tile this direction */
                 }
             }
+        }
+    }
+    const DEBUG: bool = false;
+    if DEBUG {
+        println!("Checking tiles on best paths:");
+        for (yindex, row) in (&day.maze).into_iter().enumerate() {
+            for (xindex, val) in row.into_iter().enumerate() {
+                if let None = tiles_on_best_paths.get(&(yindex, xindex)) {
+                    print!("{val}");
+                } else {
+                    print!("O");
+                }
+            }
+            println!("");
         }
     }
     tiles_on_best_paths.len()
