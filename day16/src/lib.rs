@@ -1,5 +1,7 @@
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::collections::HashSet;
 
 #[derive(Debug,Copy,Clone)]
 pub enum Direction {
@@ -178,7 +180,7 @@ fn get_major_direction(dir: Direction) -> MajorDirection {
     }
 }
 
-pub fn part1(day: &Day16) -> usize {
+fn flood_to_best_paths(day: &Day16) -> (usize, HashMap::<((usize, usize), MajorDirection), (Direction, usize)>) {
     const DEBUG: bool = false;
     let mut visited_loc_costs = HashMap::<((usize, usize), MajorDirection), (Direction, usize)>::new();
     let mut flood_steps = BinaryHeap::<MazeFloodStep>::new();
@@ -186,7 +188,7 @@ pub fn part1(day: &Day16) -> usize {
     let end   = day.end;
     flood_steps.push(MazeFloodStep{cost: 0, pos: start});
 
-    while flood_steps.len() > 0 {
+    loop {
         let maze_flood_step: MazeFloodStep = flood_steps.pop().unwrap();
         //
         //
@@ -235,12 +237,69 @@ pub fn part1(day: &Day16) -> usize {
                     println!("{:?}", flood_steps);
                 }
                 //println!("visited_loc_costs: {:?}", visited_loc_costs);
-                return maze_flood_step.cost;
+                return (maze_flood_step.cost, visited_loc_costs);
             }
             load_next_steps(&mut flood_steps, day, &maze_flood_step);
         }
     }
-    0
+}
+
+pub fn part1(day: &Day16) -> usize {
+    let (best_cost, _) = flood_to_best_paths(day);
+    best_cost
+}
+
+fn get_backwards_tile(pos: (usize, usize), dir: &Direction) -> (usize, usize) {
+    match dir {
+        Direction::North => (pos.0 + 1, pos.1),
+        Direction::East  => (pos.0, pos.1 - 1),
+        Direction::South => (pos.0 - 1, pos.1),
+        Direction::West  => (pos.0, pos.1 + 1),
+    }
+}
+fn count_num_tiles_walking_back_best_paths(day: &Day16, best_cost: usize, visited_loc_costs: &HashMap<((usize, usize), MajorDirection), (Direction, usize)>) -> usize {
+    let mut sum_of_num_tiles = 0;
+    let mut tiles_on_backwards_paths = VecDeque::<((usize, usize), usize)>::new();
+    let mut tiles_on_best_paths = HashSet::<(usize, usize)>::new();
+    let mut cur_cost = best_cost % 1000;
+    tiles_on_backwards_paths.push_back((day.end, best_cost));
+
+    while tiles_on_backwards_paths.len() > 0 {
+        let (pos, cost) = tiles_on_backwards_paths.pop_front().unwrap();
+        tiles_on_best_paths.insert(pos);
+        assert!(cost % 1000 == cur_cost || cost % 1000 == cur_cost - 1);
+        cur_cost = cost % 1000;
+
+        if cur_cost > 0 {
+            match (visited_loc_costs.get(&(pos, MajorDirection::NorthSouth)), visited_loc_costs.get(&(pos, MajorDirection::EastWest))) {
+                (Some((dir1, cost1)), Some((dir2, cost2))) => {
+                    if *cost1 % 1000 == cur_cost {
+                        tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir1), cur_cost - 1));
+                    }
+                    if *cost2 % 1000 == cur_cost {
+                        tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir2), cur_cost - 1));
+                    }
+                },
+                (Some((dir1, cost1)), None) => {
+                    assert_eq!(*cost1 % 1000, cur_cost);
+                    tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir1), cur_cost - 1));
+                },
+                (None, Some((dir2, cost2))) => {
+                    assert_eq!(*cost2 % 1000, cur_cost);
+                    tiles_on_backwards_paths.push_back((get_backwards_tile(pos, dir2), cur_cost - 1));
+                },
+                (None, None) => {
+                    /* Nothing to do if no tile this direction */
+                }
+            }
+        }
+    }
+    tiles_on_best_paths.len()
+}
+
+pub fn part2(day: &Day16) -> usize {
+    let (best_cost, visited_loc_costs) = flood_to_best_paths(day);
+    count_num_tiles_walking_back_best_paths(day, best_cost, &visited_loc_costs)
 }
 
 #[cfg(test)]
@@ -293,5 +352,17 @@ mod tests {
     fn second_example_part1_best_path_cost_11048() {
         let day = Day16::new(SECOND_EXAMPLE.lines());
         assert_eq!(11048, part1(&day));
+    }
+
+    #[test]
+    fn first_example_part2_equals_45() {
+        let day = Day16::new(FIRST_EXAMPLE.lines());
+        assert_eq!(45, part2(&day));
+    }
+
+    #[test]
+    fn second_example_part2_equals_64() {
+        let day = Day16::new(SECOND_EXAMPLE.lines());
+        assert_eq!(64, part2(&day));
     }
 }
