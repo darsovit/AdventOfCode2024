@@ -1,8 +1,6 @@
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 
-use std::cmp::Reverse;
-
 #[derive(Debug,Copy,Clone)]
 pub enum Direction {
     North,
@@ -165,17 +163,77 @@ fn load_next_steps(flood_steps: &mut BinaryHeap<MazeFloodStep>, day: &Day16, maz
         flood_steps.push(flood_step);
     }
 }
+#[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
+enum MajorDirection {
+    NorthSouth,
+    EastWest,
+}
+
+fn get_major_direction(dir: Direction) -> MajorDirection {
+    match dir {
+        Direction::North => MajorDirection::NorthSouth,
+        Direction::South => MajorDirection::NorthSouth,
+        Direction::East  => MajorDirection::EastWest,
+        Direction::West  => MajorDirection::EastWest,
+    }
+}
 
 pub fn part1(day: &Day16) -> usize {
-    let mut visited_loc_costs = HashMap::<(usize, usize), usize>::new();
+    const DEBUG: bool = false;
+    let mut visited_loc_costs = HashMap::<((usize, usize), MajorDirection), (Direction, usize)>::new();
     let mut flood_steps = BinaryHeap::<MazeFloodStep>::new();
-    flood_steps.push(MazeFloodStep{cost: 0, pos: (&day).start});
+    let start = day.start;
+    let end   = day.end;
+    flood_steps.push(MazeFloodStep{cost: 0, pos: start});
 
     while flood_steps.len() > 0 {
         let maze_flood_step: MazeFloodStep = flood_steps.pop().unwrap();
-        if let None = visited_loc_costs.get(&maze_flood_step.pos.0) {
-            visited_loc_costs.insert(maze_flood_step.pos.0, maze_flood_step.cost);
-            if maze_flood_step.pos.0 == day.end {
+        //
+        //
+        //   consider:
+        // #^###^#####^###############^#^###^#v#^###########v#v#v#^###v#^#v#####^#####v#####v#^###.###^#######^#v#v#####^###^###^###########^#####^#v#^#
+        // #<<<<<<^>>>>>>>>>>>>>>#^>>>>#^#^>>#v#^#^>>>>>>>>#v#v#v#^#<<v#^#v>>>>#^#<<^#v#^<^#v#^#.....#<<<<<<^#<<v#v>>>>>>>>>>>>#<<<<<<<<<<^#<<^#^#<<v#^#
+        // #######^#############v#^#####^#^#v###^#^#####v#v#v#v###^#v###^#####v#^#v#^###^#^#v#^#########v#v#^#############v###v###########^###^#^#####^#
+        // #^>>>>>X>>>>>>#<<^>>#v#<<<<^#^#^#v#^>>#^#^>>#v#v#v#v>>#^#v>>#^>>>>#v#<<v#<<^#^#^#v>>>>>>>>>>#v#v#<<<<<<<<<<^#<<v>>#v#<<<<<<^#^#<<^#<<<<<<^#^#
+        // #^#v###^#####v###^###^#####^#^#^###^###^#^#v#v###v###v#^###^#^#v###v#######^#^#^###########v###v###########^###v#v#v#####v#^#^###^#######^#^#
+        //   -- The X position can be visited two different ways and the cost, but the first one getting there chooses
+        //   -- the cost of the positions beyond the X to the top and right when we don't allow the second to 'pass through'
+        //
+        let visited_key = (maze_flood_step.pos.0, get_major_direction(maze_flood_step.pos.1));
+        if let None = visited_loc_costs.get(&visited_key) {
+            visited_loc_costs.insert(visited_key, (maze_flood_step.pos.1, maze_flood_step.cost));
+            if maze_flood_step.pos.0 == end {
+                if DEBUG {
+                    println!("Map at end: ");
+                    fn print_direction(dir: Direction) {
+                        match dir {
+                            Direction::North => { print!("^"); },
+                            Direction::East  => { print!(">"); },
+                            Direction::South => { print!("v"); },
+                            Direction::West  => { print!("<"); },
+                        }
+                    }
+                    for (yindex, row) in (&day.maze).into_iter().enumerate() {
+                        for (xindex, val) in row.into_iter().enumerate() {
+                            match (visited_loc_costs.get(&((yindex, xindex), MajorDirection::NorthSouth)), visited_loc_costs.get(&((yindex, xindex), MajorDirection::EastWest))) {
+                                (Some((_dir1, _cost1)), Some((_dir2, _cost2))) => {
+                                    print!("X");
+                                }
+                                (Some((dir, _)), None) => {
+                                    print_direction(*dir);
+                                }
+                                (None, Some((dir, _))) => {
+                                    print_direction(*dir);
+                                }
+                                (None, None) => {
+                                    print!("{val}");
+                                }
+                            }
+                        }
+                        println!("");
+                    }
+                    println!("{:?}", flood_steps);
+                }
                 //println!("visited_loc_costs: {:?}", visited_loc_costs);
                 return maze_flood_step.cost;
             }
