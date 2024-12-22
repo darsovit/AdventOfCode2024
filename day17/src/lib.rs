@@ -38,20 +38,20 @@ fn interpret_opcode_and_operand(opcode: u8, operand: u8) -> Instruction {
 struct Computer {
     program: Vec<Instruction>,
     ip: Cell<usize>,
-    a: Cell<u32>,
-    b: Cell<u32>,
-    c: Cell<u32>,
+    a: Cell<u64>,
+    b: Cell<u64>,
+    c: Cell<u64>,
 }
 
 impl Computer {
-    fn new(program: Vec<Instruction>, ip: usize, a: u32, b: u32, c: u32) -> Self {
+    fn new(program: Vec<Instruction>, ip: usize, a: u64, b: u64, c: u64) -> Self {
         Computer{program: program.clone(), ip: Cell::new(ip), a: Cell::new(a), b: Cell::new(b), c: Cell::new(c)}
     }
 
-    fn operand_value(&self, operand: &Operand) -> u32 {
+    fn operand_value(&self, operand: &Operand) -> u64 {
         match operand {
             Operand::Combo(val) => {
-                if *val < 4 { return *val as u32; }
+                if *val < 4 { return *val as u64; }
                 match val {
                     4 => self.a.get(),
                     5 => self.b.get(),
@@ -59,7 +59,7 @@ impl Computer {
                     _ => { panic!("Invalid combo operand"); }
                 }
             },
-            Operand::Literal(val) => *val as u32
+            Operand::Literal(val) => *val as u64
         }
     }
 
@@ -171,6 +171,7 @@ fn interpret_program(program: &Vec<u8>) -> Vec<Instruction> {
 
 pub struct Day17 {
     computer: Computer,
+    program_codes: Vec<u8>,
 }
 
 impl Day17 {
@@ -184,18 +185,52 @@ impl Day17 {
         lines_iter.next();
         let program_codes = &program_re.captures(lines_iter.next().unwrap()).unwrap()[1];
 
-        let a = register_a[1].parse::<u32>().unwrap();
-        let b = register_b[1].parse::<u32>().unwrap();
-        let c = register_c[1].parse::<u32>().unwrap();
+        let a = register_a[1].parse::<u64>().unwrap();
+        let b = register_b[1].parse::<u64>().unwrap();
+        let c = register_c[1].parse::<u64>().unwrap();
 
         let code: Vec<u8> = program_codes.split(",").map(|v| v.parse::<u8>().unwrap()).collect();
         let program = interpret_program(&code);
 
-        Day17{computer: Computer::new(program, 0, a, b, c)}
+        Day17{computer: Computer::new(program, 0, a, b, c), program_codes: code}
     }
 
     pub fn part1(&self) -> String {
         self.computer.run()
+    }
+
+    pub fn part2(&self) -> u64 {
+        // Running the computer 8 steps gets through to the loop.
+        // Need to step backwards through each output to get them to line up with the program code,
+        // to understand what possible 'A' start positions result in the answer for this step.
+        let mut possible_as = Vec::<u64>::new();
+        possible_as.push(0);
+
+        for val in (&self.program_codes).into_iter().rev() {
+            let mut next_possible_as = Vec::<u64>::new();
+            for possible_a in possible_as {
+                for i in 0..7 {
+                    let test_a: u64 = (possible_a << 3) | i;
+                    self.computer.a.set(test_a);
+                    self.computer.ip.set(0);
+                    self.computer.step();
+                    self.computer.step();
+                    self.computer.step();
+                    self.computer.step();
+                    self.computer.step();
+                    self.computer.step();
+                    let (_, output) = self.computer.step();
+                    if *val == output.unwrap().parse::<u8>().unwrap() {
+                        next_possible_as.push(test_a);
+                    }
+                }
+            }
+            possible_as = next_possible_as;
+            println!("{:?}", possible_as);
+        }
+        println!("{:?}", possible_as);
+        possible_as.sort();
+        possible_as[0]
     }
 }
 
