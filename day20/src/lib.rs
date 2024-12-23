@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -80,6 +81,24 @@ impl Day20 {
         neighbors
     }
 
+    fn find_valid_ends_within_20manhattan_distance(&self, pos: &Pos) -> Vec<(Pos, usize)> {
+        let mut possible_ends = Vec::<(Pos, usize)>::new();
+
+        for neighbor in self.find_valid_2space_neighbors(pos) {
+            possible_ends.push((neighbor, 2));
+        }
+        for distance in 3..20 {
+            for x in 0..distance+1 {
+                let y = distance - x;
+                if let Some(neighbor) = self.is_valid_neighbor(pos, (x, y)) { possible_ends.push((neighbor, distance as usize)); }
+                if x > 0 { if let Some(neighbor) = self.is_valid_neighbor(pos, (-x, y)) { possible_ends.push((neighbor, distance as usize)); } }
+                if x > 0 && y > 0 { if let Some(neighbor) = self.is_valid_neighbor(pos, (-x, -y)) { possible_ends.push((neighbor, distance as usize)); } }
+                if y > 0 { if let Some(neighbor) = self.is_valid_neighbor(pos, (x, -y)) { possible_ends.push((neighbor, distance as usize)); } }
+            }
+        }
+        possible_ends
+    }
+
     fn walk_the_maze(&self) -> HashMap<Pos, usize> {
         let mut time_to_point = HashMap::<Pos, usize>::new();
         let mut work_to_do = VecDeque::<(Pos, usize)>::new();
@@ -98,16 +117,16 @@ impl Day20 {
         time_to_point
     }
 
-    fn get_cheats_for_at_least(&self, saves_at_least: usize) -> HashMap<usize, Vec<(Pos, Pos)>> {
+    fn get_2ps_cheats_for_at_least(&self, saves_at_least: usize) -> HashMap<usize, HashSet<(Pos, Pos)>> {
         let steps_along_path = self.walk_the_maze();
-        let mut cheats_found = HashMap::<usize, Vec<(Pos, Pos)>>::new();
+        let mut cheats_found = HashMap::<usize, HashSet<(Pos, Pos)>>::new();
         for (step_along_path, time) in &steps_along_path {
             for neighbor in self.find_valid_2space_neighbors(&step_along_path) {
                 if let Some(time2) = steps_along_path.get(&neighbor) {
                     if *time2 > *time && *time2 - *time > 2 {
                         let time_saved = *time2 - *time - 2;
                         if time_saved >= saves_at_least {
-                            cheats_found.entry(*time2 - *time - 2).or_insert(Vec::<(Pos, Pos)>::new()).push((*step_along_path, neighbor));
+                            cheats_found.entry(*time2 - *time - 2).or_insert(HashSet::<(Pos, Pos)>::new()).insert((*step_along_path, neighbor));
                         }
                     }
                 }
@@ -117,8 +136,36 @@ impl Day20 {
         cheats_found
     }
 
+    fn get_20ps_cheats_for_at_least(&self, saves_at_least: usize) -> HashMap<usize, HashSet<(Pos, Pos)>> {
+        let steps_along_path = self.walk_the_maze();
+        let mut cheats_found = HashMap::<usize, HashSet<(Pos, Pos)>>::new();
+        for (step_along_path, time) in &steps_along_path {
+            for (neighbor, dist) in self.find_valid_ends_within_20manhattan_distance(&step_along_path) {
+                if let Some(time2) = steps_along_path.get(&neighbor) {
+                    if *time2 > *time && *time2 - *time > dist {
+                        let time_saved = *time2 - *time - dist;
+                        if time_saved >= saves_at_least {
+                            cheats_found.entry(time_saved).or_insert(HashSet::<(Pos, Pos)>::new()).insert((*step_along_path, neighbor));
+                        }
+                    }
+                }
+            }
+        }
+        println!("{:?}", cheats_found);
+        cheats_found
+    }
     pub fn part1(&self, saves_at_least: usize) -> usize {
-        let cheat_savings_and_locs = self.get_cheats_for_at_least(saves_at_least);
+        let cheat_savings_and_locs = self.get_2ps_cheats_for_at_least(saves_at_least);
+        let mut count_of_cheats_for_at_least = 0;
+        for (k,v) in cheat_savings_and_locs {
+            assert!(k >= saves_at_least);
+            count_of_cheats_for_at_least += v.len();
+        }
+        count_of_cheats_for_at_least
+    }
+
+    pub fn part2(&self, saves_at_least: usize) -> usize {
+        let cheat_savings_and_locs = self.get_20ps_cheats_for_at_least(saves_at_least);
         let mut count_of_cheats_for_at_least = 0;
         for (k,v) in cheat_savings_and_locs {
             assert!(k >= saves_at_least);
@@ -176,5 +223,29 @@ mod tests {
     fn sample_input_has_5_cheats_at_least_20() {
         let day = Day20::new(SAMPLE_INPUT.lines());
         assert_eq!(5, day.part1(20));
+    }
+
+    #[test]
+    fn sample_input_p2_has_3_cheats_at_least_76() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(3, day.part2(76));
+    }
+
+    #[test]
+    fn sample_input_p2_has_7_cheats_at_least_74() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(7, day.part2(74));
+    }
+
+    #[test]
+    fn sample_input_p2_has_29_cheats_at_least_72() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(29, day.part2(72));
+    }
+
+    #[test]
+    fn sample_input_p2_has_41_cheats_at_least_70() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(41, day.part2(70));
     }
 }
