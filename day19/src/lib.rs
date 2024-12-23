@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::collections::HashSet;
+use std::collections::BinaryHeap;
+
+use std::cmp::Reverse;
 
 #[derive(Default, Debug)]
 struct TrieNode {
@@ -53,9 +57,7 @@ impl Trie {
                 None => return available_patterns,
             }
         }
-        if current_node.is_end_of_word {
-            available_patterns.push(smashed_words);
-        }
+
         available_patterns
     }
 }
@@ -117,6 +119,39 @@ impl Day19 {
         }
         possible_displays
     }
+
+    pub fn part2(&self) -> usize {
+        const DEBUG: bool = false;
+        let mut possible_displays = 0;
+
+        for desired_display in &self.desired_displays {
+            if DEBUG { println!("Searching for available towel patterns in {desired_display}"); }
+            let mut count_ways_to_get_to_prefix_length = HashMap::<usize, usize>::new();
+            let mut find_matches_from = BinaryHeap::<Reverse<usize>>::new();
+            let mut last_size_checked = 0;
+            find_matches_from.push(Reverse(0));
+            count_ways_to_get_to_prefix_length.insert(0, 1);
+
+            while find_matches_from.len() > 0 {
+                if let Some(Reverse(length_to_find)) = find_matches_from.pop() {
+                    if let Some(counts_to_now) = count_ways_to_get_to_prefix_length.remove(&length_to_find) {
+                        let found_patterns = self.available_towel_patterns.find_available_patterns(&desired_display[length_to_find..]);
+                        for pattern in found_patterns {
+                            let new_len = length_to_find + pattern.len();
+                            *count_ways_to_get_to_prefix_length.entry(new_len).or_insert(0) += counts_to_now;
+                            if new_len != desired_display.len() {
+                                find_matches_from.push(Reverse(new_len));
+                            }
+                        }
+                    } // otherwise, we've already moved on from this spot
+                }
+            }
+            if let Some(count) = count_ways_to_get_to_prefix_length.get(&desired_display.len()) {
+                possible_displays += count;
+            }
+        }
+        possible_displays
+    }
 }
 
 #[cfg(test)]
@@ -139,5 +174,11 @@ bbrgwb
     fn part1_sample_input_is_6() {
         let day = Day19::new(SAMPLE_INPUT.lines());
         assert_eq!(6, day.part1());
+    }
+
+    #[test]
+    fn part2_sample_input_is_16() {
+        let day = Day19::new(SAMPLE_INPUT.lines());
+        assert_eq!(16, day.part2());
     }
 }
