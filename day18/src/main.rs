@@ -8,6 +8,7 @@ fn main() {
         Ok(line_content) => {
             let day = Day18::new(line_content.lines(), 70, 70);
             println!("part1: {}", day.part1(1024));
+            println!("part2: {:?}", day.part2(1024));
             //println!("part2: {}", day.part2());
         },
         Err(e) => { println!("Error reading file: {}, {:?}", DATAFILE, e); }
