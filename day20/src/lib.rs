@@ -132,7 +132,6 @@ impl Day20 {
                 }
             }
         }
-        println!("{:?}", cheats_found);
         cheats_found
     }
 
@@ -151,7 +150,6 @@ impl Day20 {
                 }
             }
         }
-        println!("{:?}", cheats_found);
         cheats_found
     }
     pub fn part1(&self, saves_at_least: usize) -> usize {
@@ -247,5 +245,60 @@ mod tests {
     fn sample_input_p2_has_41_cheats_at_least_70() {
         let day = Day20::new(SAMPLE_INPUT.lines());
         assert_eq!(41, day.part2(70));
+    }
+
+    #[test]
+    fn sample_input_p2_has_55_cheats_at_least_68() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(55, day.part2(68));
+    }
+
+    #[test]
+    fn sample_input_p2_has_67_cheats_at_least_66() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(67, day.part2(66));
+    }
+
+    #[test]
+    fn sample_input_p2_has_86_cheats_at_least_64() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(86, day.part2(64));
+    }
+
+    #[test]
+    fn sample_input_p2_has_106_cheats_at_least_62() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(106, day.part2(62));
+    }
+
+    #[test]
+    fn sample_input_p2_has_129_cheats_at_least_60() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(129, day.part2(60));
+    }
+    #[test]
+    fn sample_input_p2_has_154_cheats_at_least_58() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(154, day.part2(58));
+    }
+    #[test]
+    fn sample_input_p2_has_193_cheats_at_least_56() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(193, day.part2(56));
+    }
+    #[test]
+    fn sample_input_p2_has_222_cheats_at_least_54() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(222, day.part2(54));
+    }
+    #[test]
+    fn sample_input_p2_has_253_cheats_at_least_52() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(253, day.part2(52));
+    }
+    #[test]
+    fn sample_input_p2_has_285_cheats_at_least_50() {
+        let day = Day20::new(SAMPLE_INPUT.lines());
+        assert_eq!(285, day.part2(50));
     }
 }
