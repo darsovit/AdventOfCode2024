@@ -73,24 +73,49 @@ fn move_and_activate_robot_arm(init: (usize, usize), dest: (usize, usize), bad_s
     let mut robot_controls = Vec::<RobotControl>::new();
     let mut pos = init;
 
-    while pos.0 > dest.0 {
-        robot_controls.push(RobotControl::Right);
-        pos = (pos.0 - 1, pos.1);
+    // If our cursor is on the row with the bad spot and if our destination column is on the bad spot column
+    // we want to move up or down first, otherwise, prefer moving left moves first because a robot controller has 
+    // the left control furthest away from activate
+    if dest.0 == bad_spot.0 && pos.1 == bad_spot.1 {
+        while pos.1 > dest.1 {
+            robot_controls.push(RobotControl::Down);
+            pos = (pos.0, pos.1 - 1);
+            assert_ne!(pos, bad_spot);
+        }
+        while pos.1 < dest.1 {
+            robot_controls.push(RobotControl::Up);
+            pos = (pos.0, pos.1 + 1);
+            assert_ne!(pos, bad_spot);
+        }
+    }
+    while pos.0 < dest.0 {
+        robot_controls.push(RobotControl::Left);
+        pos = (pos.0 + 1, pos.1);
         assert_ne!(pos, bad_spot);
+    }
+    // For numpad
+    // if our destination row is the same row as the bad spot, and our position column matches, prefer
+    // to go right before moving down onto the bad spot
+    if dest.1 == bad_spot.1 && pos.0 == bad_spot.0 {
+        while pos.0 > dest.0 {
+            robot_controls.push(RobotControl::Right);
+            pos = (pos.0 - 1, pos.1);
+            assert_ne!(pos, bad_spot);
+        }            
     }
     while pos.1 > dest.1 {
         robot_controls.push(RobotControl::Down);
         pos = (pos.0, pos.1 - 1);
         assert_ne!(pos, bad_spot);
     }
+    while pos.0 > dest.0 {
+        robot_controls.push(RobotControl::Right);
+        pos = (pos.0 - 1, pos.1);
+        assert_ne!(pos, bad_spot);
+    }
     while pos.1 < dest.1 {
         robot_controls.push(RobotControl::Up);
         pos = (pos.0, pos.1 + 1);
-        assert_ne!(pos, bad_spot);
-    }
-    while pos.0 < dest.0 {
-        robot_controls.push(RobotControl::Left);
-        pos = (pos.0 + 1, pos.1);
         assert_ne!(pos, bad_spot);
     }
 
