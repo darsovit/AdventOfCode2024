@@ -1,0 +1,250 @@
+use regex::Regex;
+use std::fmt;
+
+pub struct Day21 {
+    codes: Vec<String>,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum NumpadControl {
+    Activate,
+    Zero,
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+}
+
+#[derive(Copy, Clone)]
+enum RobotControl {
+    Up,
+    Activate,
+    Left,
+    Down,
+    Right,
+}
+
+impl fmt::Debug for RobotControl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}",
+            match self {
+                RobotControl::Up => "^",
+                RobotControl::Down => "v",
+                RobotControl::Left => "<",
+                RobotControl::Right => ">",
+                RobotControl::Activate => "A",
+            }
+        )
+    }
+}
+
+fn get_robot_control_position(button: &RobotControl) -> (usize, usize) {
+    match button {
+        RobotControl::Activate => (0, 1),
+        RobotControl::Up       => (1, 1),
+        RobotControl::Left     => (2, 0),
+        RobotControl::Down     => (1, 0),
+        RobotControl::Right    => (0, 0),
+    }
+}
+
+fn get_numpad_position(button: &NumpadControl) -> (usize, usize) {
+    match button {
+        NumpadControl::Activate => (0,0),
+        NumpadControl::Zero     => (1,0),
+        NumpadControl::One      => (2,1),
+        NumpadControl::Two      => (1,1),
+        NumpadControl::Three    => (0,1),
+        NumpadControl::Four     => (2,2),
+        NumpadControl::Five     => (1,2),
+        NumpadControl::Six      => (0,2),
+        NumpadControl::Seven    => (2,3),
+        NumpadControl::Eight    => (1,3),
+        NumpadControl::Nine     => (0,3),
+    }
+}
+
+fn move_and_activate_robot_arm(init: (usize, usize), dest: (usize, usize), bad_spot: (usize, usize)) -> Vec<RobotControl> {
+    let mut robot_controls = Vec::<RobotControl>::new();
+    let mut pos = init;
+
+    while pos.0 > dest.0 {
+        robot_controls.push(RobotControl::Right);
+        pos = (pos.0 - 1, pos.1);
+        assert_ne!(pos, bad_spot);
+    }
+    while pos.1 > dest.1 {
+        robot_controls.push(RobotControl::Down);
+        pos = (pos.0, pos.1 - 1);
+        assert_ne!(pos, bad_spot);
+    }
+    while pos.1 < dest.1 {
+        robot_controls.push(RobotControl::Up);
+        pos = (pos.0, pos.1 + 1);
+        assert_ne!(pos, bad_spot);
+    }
+    while pos.0 < dest.0 {
+        robot_controls.push(RobotControl::Left);
+        pos = (pos.0 + 1, pos.1);
+        assert_ne!(pos, bad_spot);
+    }
+
+    robot_controls.push(RobotControl::Activate);
+    robot_controls
+}
+
+fn numpad_control_sequence(init: NumpadControl, dest: &NumpadControl) -> Vec<RobotControl> {
+    let start_pos = get_numpad_position(&init);
+    let end_pos   = get_numpad_position(dest);
+    move_and_activate_robot_arm(start_pos, end_pos, (2, 0))
+}
+
+fn robot_control_sequence(init: &RobotControl, dest: &RobotControl) -> Vec<RobotControl> {
+    let start_pos = get_robot_control_position(init);
+    let end_pos   = get_robot_control_position(dest);
+    move_and_activate_robot_arm(start_pos, end_pos, (2, 1))
+}
+
+fn char_to_numpad_control(a_char: char) -> NumpadControl {
+    match a_char {
+        'A' => NumpadControl::Activate,
+        '0' => NumpadControl::Zero,
+        '1' => NumpadControl::One,
+        '2' => NumpadControl::Two,
+        '3' => NumpadControl::Three,
+        '4' => NumpadControl::Four,
+        '5' => NumpadControl::Five,
+        '6' => NumpadControl::Six,
+        '7' => NumpadControl::Seven,
+        '8' => NumpadControl::Eight,
+        '9' => NumpadControl::Nine,
+        _ => panic!("Unknown character: {a_char} requested from numpad control"),
+    }
+}
+
+fn numpad_sequence(output: &str) -> Vec<RobotControl> {
+    let mut robot_controls = Vec::<RobotControl>::new();
+    let mut last_position = NumpadControl::Activate;
+    for next in output.chars() {
+        let next = char_to_numpad_control(next);
+        robot_controls.append(&mut numpad_control_sequence(last_position, &next));
+        last_position = next;
+    }
+    println!("NUMPAD: {:?}", robot_controls);
+    robot_controls
+}
+
+fn robot_sequence(robot_controls: &Vec<RobotControl>) -> Vec<RobotControl> {
+    let mut output_controls = Vec::<RobotControl>::new();
+    let mut last_position = RobotControl::Activate;
+    for control in robot_controls {
+        output_controls.append(&mut robot_control_sequence(&last_position, control));
+        last_position = *control;
+    }
+    println!("DIR PAD: {:?}", output_controls);
+    output_controls
+}
+
+fn code_as_number(code: &str) -> usize {
+    let number_re = Regex::new(r"(\d+)A").unwrap();
+    let number = number_re.captures(code).unwrap();
+    number[1].parse::<usize>().unwrap()
+}
+
+fn complexity_length(code: &str) -> usize {
+    let user_sequence = robot_sequence(&mut robot_sequence(&mut numpad_sequence(code)));
+    user_sequence.len()
+}
+
+impl Day21 {
+    pub fn new(lines: std::str::Lines<'_>) -> Self {
+        let mut codes = Vec::<String>::new();
+        for line in lines {
+            codes.push(line.to_string());
+        }
+        Day21{codes}
+    }
+
+    pub fn part1(&self) -> usize {
+        let mut sum_of_complexities = 0;
+        for code in &self.codes {
+            sum_of_complexities += complexity_length(code) * code_as_number(code);
+        }
+        sum_of_complexities
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    const SAMPLE_INPUT: &str =
+"029A
+980A
+179A
+456A
+379A";
+
+    #[test]
+    fn validate_sequence_029A_length() {
+        let robot_controls = numpad_sequence("029A");
+        assert_eq!(12, robot_controls.len());
+    }
+
+    #[test]
+    fn validate_sequence_029A_through_two_robots_length() {
+        let result_robot_controls = robot_sequence(&mut numpad_sequence("029A"));
+        assert_eq!(28, result_robot_controls.len());
+    }
+
+    #[test]
+    fn validate_sequence_029A_through_three_robots_length() {
+        let robot3_controls = robot_sequence(&mut robot_sequence(&mut numpad_sequence("029A")));
+
+        assert_eq!(68, robot3_controls.len());
+    }
+
+    #[test]
+    fn part1_sample_input_results_in_126384() {
+        let day = Day21::new(SAMPLE_INPUT.lines());
+        assert_eq!(126384, day.part1());
+    }
+
+    #[test]
+    fn sample_029A_complexity_is_29() {
+        assert_eq!(68, complexity_length("029A"));
+    }
+
+    #[test]
+    fn sample_980A_complexity_is_60() {
+        assert_eq!(60, complexity_length("980A"));
+    }
+
+    #[test]
+    fn sample_179A_complexity_is_68() {
+        assert_eq!(68, complexity_length("179A"));
+    }
+
+    #[test]
+    fn sample_456A_complexity_is_64() {
+        assert_eq!(64, complexity_length("456A"));
+    }
+
+    #[test]
+    fn sample_379A_complexity_is_64() {
+        assert_eq!(64, complexity_length("379A"));
+        //               3                                  7              9                       A
+        //         ^     A         ^^           <<          A       >>     A           vvv         A
+        //    <    A  >  A    <    AA   v  <    AA  >>   ^  A   v   AA  ^  A   v  <    AAA  >   ^  A
+        // v<<A >>^A vA ^A v<<A >>^AA v<A <A >>^AA vAA ^<A >A v<A >^AA <A >A v<A <A >>^AAA vA ^<A >A
+
+        //               3                                 7
+        //         ^     A               <<         ^^     A
+        //    <    A  >  A    v    <<    AA  >   ^  AA  >  A
+        // <v<A >>^A vA ^A  <vA   <AA >>^AA vA <^A >AA vA ^A <vA >^AA <A >A <v<A >A >^AAA vA <^A >A
+    }
+}
