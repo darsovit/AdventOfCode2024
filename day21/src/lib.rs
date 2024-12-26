@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::fmt;
+use std::collections::HashMap;
 
 pub struct Day21 {
     codes: Vec<String>,
@@ -20,7 +21,7 @@ enum NumpadControl {
     Nine,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum RobotControl {
     Up,
     Activate,
@@ -129,6 +130,7 @@ fn numpad_control_sequence(init: NumpadControl, dest: &NumpadControl) -> Vec<Rob
     move_and_activate_robot_arm(start_pos, end_pos, (2, 0))
 }
 
+
 fn robot_control_sequence(init: &RobotControl, dest: &RobotControl) -> Vec<RobotControl> {
     let start_pos = get_robot_control_position(init);
     let end_pos   = get_robot_control_position(dest);
@@ -160,7 +162,6 @@ fn numpad_sequence(output: &str) -> Vec<RobotControl> {
         robot_controls.append(&mut numpad_control_sequence(last_position, &next));
         last_position = next;
     }
-    println!("NUMPAD: {:?}", robot_controls);
     robot_controls
 }
 
@@ -171,7 +172,6 @@ fn robot_sequence(robot_controls: &Vec<RobotControl>) -> Vec<RobotControl> {
         output_controls.append(&mut robot_control_sequence(&last_position, control));
         last_position = *control;
     }
-    println!("DIR PAD: {:?}", output_controls);
     output_controls
 }
 
@@ -184,6 +184,63 @@ fn code_as_number(code: &str) -> usize {
 fn complexity_length(code: &str) -> usize {
     let user_sequence = robot_sequence(&mut robot_sequence(&mut numpad_sequence(code)));
     user_sequence.len()
+}
+
+fn robot_control_sequence_n(last_control: &RobotControl, next_control: &RobotControl, n: usize) -> Vec<RobotControl> {
+    let mut result = robot_control_sequence(last_control, next_control);
+    for _ in 0..n-1 {
+        // Once we're down at least one level, it will always start at Activate
+        result = robot_sequence(&result);
+    }
+    result
+}
+
+fn build_control_counts(sequence: &Vec<RobotControl>) -> HashMap<(RobotControl, RobotControl), usize> {
+    let mut control_pattern_counts: HashMap<(RobotControl, RobotControl), usize> = HashMap::new();
+    let mut last_control = RobotControl::Activate;
+    for control in sequence {
+        *control_pattern_counts.entry((last_control, *control)).or_insert(0) += 1;
+        last_control = *control;
+    }
+    control_pattern_counts
+}
+
+fn calculate_next_5(lower_count: &HashMap<(RobotControl, RobotControl), usize>,
+                    cache_of_5_levels: &mut HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>>)
+         -> HashMap<(RobotControl, RobotControl), usize> {
+    let mut new_count_of_sequences = HashMap::new();
+    for (pattern, count) in lower_count {
+        let result = cache_of_5_levels.entry(*pattern).or_insert(build_control_counts(&robot_control_sequence_n(&pattern.0, &pattern.1, 5)));
+        for (result_pattern, result_count) in result {
+            let val = new_count_of_sequences.entry(*result_pattern).or_insert(0);
+            *val += *result_count * count;
+        }
+    }
+    new_count_of_sequences
+}
+
+fn pt2_complexity_length(code: &str) -> usize {
+    let numpad_control_sequence = numpad_sequence(code);
+    let mut cache_of_5_levels: HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>> = HashMap::new();
+
+    let mut last_control = RobotControl::Activate;
+    let mut sequence_for_5_for_all = Vec::<RobotControl>::new();
+    for next_control in numpad_control_sequence {
+        let mut sequence_for_5 = robot_control_sequence_n(&last_control, &next_control, 5);
+        cache_of_5_levels.entry((last_control, next_control)).or_insert(build_control_counts(&sequence_for_5));
+        sequence_for_5_for_all.append(&mut sequence_for_5);
+        last_control = next_control;
+    }
+
+    let mut count_of_sequences: HashMap<(RobotControl, RobotControl), usize> = build_control_counts(&sequence_for_5_for_all);
+    for _ in 0..4 {
+        count_of_sequences = calculate_next_5(&count_of_sequences, &mut cache_of_5_levels);
+    }
+    let mut num_steps_at_25_deep: usize = 0;
+    for (_, count) in count_of_sequences {
+        num_steps_at_25_deep += count;
+    }
+    num_steps_at_25_deep
 }
 
 impl Day21 {
@@ -199,6 +256,16 @@ impl Day21 {
         let mut sum_of_complexities = 0;
         for code in &self.codes {
             sum_of_complexities += complexity_length(code) * code_as_number(code);
+        }
+        sum_of_complexities
+    }
+
+    pub fn part2(&self) -> usize {
+        let mut sum_of_complexities = 0;
+        for code in &self.codes {
+            let pt2_complexity_len= pt2_complexity_length(code);
+            println!("{code}: {pt2_complexity_len}");
+            sum_of_complexities += pt2_complexity_len * code_as_number(code);
         }
         sum_of_complexities
     }
