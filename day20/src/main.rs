@@ -9,7 +9,6 @@ fn main() {
             let day = Day20::new(line_content.lines());
             println!("part1: {}", day.part1(100));
             println!("part2: {}", day.part2(100));
-            println!("part2: 856578 is too low");
         },
         Err(e) => { println!("Error reading file: {}, {:?}", DATAFILE, e); }
     }

@@ -87,7 +87,7 @@ impl Day20 {
         for neighbor in self.find_valid_2space_neighbors(pos) {
             possible_ends.push((neighbor, 2));
         }
-        for distance in 3..20 {
+        for distance in 3..21 {
             for x in 0..distance+1 {
                 let y = distance - x;
                 if let Some(neighbor) = self.is_valid_neighbor(pos, (x, y)) { possible_ends.push((neighbor, distance as usize)); }
