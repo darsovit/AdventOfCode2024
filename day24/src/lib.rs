@@ -8,10 +8,19 @@ pub struct Day24 {
     gates: HashMap<String, Gate>,
 }
 
-pub enum Gate {
-    AND(String, String),
-    XOR(String, String),
-    OR(String, String),
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum GateOp {
+    AND,
+    XOR,
+    OR,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct Gate {
+    op: GateOp,
+    left: String,
+    right: String,
+    target: String,
 }
 
 impl Day24 {
@@ -44,9 +53,9 @@ impl Day24 {
                 wires.insert(left.clone());
                 wires.insert(right.clone());
                 match gate {
-                    "AND" => gates.insert(target, Gate::AND(left, right)),
-                    "OR" =>  gates.insert(target, Gate::OR(left, right)),
-                    "XOR" => gates.insert(target, Gate::XOR(left, right)),
+                    "AND" => gates.insert(target.clone(), Gate{op: GateOp::AND, left, right, target}),
+                    "OR" =>  gates.insert(target.clone(), Gate{op: GateOp::OR, left, right, target}),
+                    "XOR" => gates.insert(target.clone(), Gate{op: GateOp::XOR, left, right, target}),
                     _ => todo!()
                 };
             }
@@ -83,31 +92,17 @@ impl Day24 {
             let wire_to_find = stack_of_wires.pop().unwrap();
             if let None = wire_values.get(wire_to_find) {
                 if let Some(gate) = self.gates.get(wire_to_find) {
-                    match gate {
-                        Gate::AND(left, right) => {
-                            match (wire_values.get(&left as &str), wire_values.get(&right as &str)) {
-                                (Some(a), Some(b)) => { wire_values.insert(wire_to_find, *a && *b); },
-                                (Some(a), None)    => { if *a { stack_of_wires.push(wire_to_find); stack_of_wires.push(right); } else { wire_values.insert(wire_to_find, *a); } },
-                                (None, Some(b))    => { if *b { stack_of_wires.push(wire_to_find); stack_of_wires.push(left); } else { wire_values.insert(wire_to_find, *b); } },
-                                (None, None)       => { stack_of_wires.push(wire_to_find); stack_of_wires.push(left); stack_of_wires.push(right); }
-                            }
+                    match (wire_values.get(&gate.left as &str), wire_values.get(&gate.right as &str)) {
+                        (Some(a), Some(b)) => {
+                            match gate.op {
+                                GateOp::AND => wire_values.insert(wire_to_find, *a && *b),
+                                GateOp::XOR => wire_values.insert(wire_to_find, *a ^ *b),
+                                GateOp::OR  => wire_values.insert(wire_to_find, *a || *b),
+                            };
                         },
-                        Gate::OR(left, right) => {
-                            match (wire_values.get(&left as &str), wire_values.get(&right as &str)) {
-                                (Some(a), Some(b)) => { wire_values.insert(wire_to_find, *a || *b); },
-                                (Some(a), None)    => { if !*a { stack_of_wires.push(wire_to_find); stack_of_wires.push(right); } else { wire_values.insert(wire_to_find, *a); } },
-                                (None, Some(b))    => { if !*b { stack_of_wires.push(wire_to_find); stack_of_wires.push(left); } else { wire_values.insert(wire_to_find, *b); }},
-                                (None, None)       => { stack_of_wires.push(wire_to_find); stack_of_wires.push(left); stack_of_wires.push(right); }
-                            }
-                        },
-                        Gate::XOR(left, right) => {
-                            match (wire_values.get(&left as &str), wire_values.get(&right as &str)) {
-                                (Some(a), Some(b)) => { wire_values.insert(wire_to_find, *a ^ *b); },
-                                (Some(_), None)    => { stack_of_wires.push(wire_to_find); stack_of_wires.push(right); },
-                                (None, Some(_))    => { stack_of_wires.push(wire_to_find); stack_of_wires.push(left); },
-                                (None, None)       => { stack_of_wires.push(wire_to_find); stack_of_wires.push(left); stack_of_wires.push(right); }
-                            }
-                        }
+                        (Some(a), None) => { stack_of_wires.push(wire_to_find); stack_of_wires.push(&gate.right); },
+                        (None, Some(b)) => { stack_of_wires.push(wire_to_find); stack_of_wires.push(&gate.left); },
+                        (None, None) => { stack_of_wires.push(wire_to_find); stack_of_wires.push(&gate.right); stack_of_wires.push(&gate.left); },
                     }
                 }
             }
@@ -126,6 +121,168 @@ impl Day24 {
         value
     }
 
+    /*
+    For part2, we need to identify which wires are miswired to 'solve' the problem that the machine isn't correctly
+    performing x + y = z.
+
+    This addition machine is made up of gates, the basic theory for adding the values together are going to be
+
+    x00 ^ y00 => z00,                                               x00 & y00 => jfb (overflow of 1, used in constructing z01)
+    x01 ^ y01 => jjj, jjj ^ jfb => z01                              x01 & y01 => cpp, jfb & jjj => pss, cpp | pss -> rtc (rtc is overflow from z01 -> z02)
+    x02 ^ y02 => fkn, fkn ^ rtc => z02                              x02 & y02 => vrb, rtc & fkn => dbr, dbr | vrb -> psp (psp is overflow from z02 -> z03)
+    x03 ^ y03 => fhp, fhp ^ psp => z03                              x03 & y03 => ttc, fhp & psp => vkp, vkp | ttc -> rsk (rsk is overflow from z03 -> z04)
+    x04 ^ y04 => cwp, cwp ^ rsk => z04                              x04 & y04 => dsn, cwp & rsk => dmh, dsn | dmh -> tsw (tsw is overflow from z04 -> z05)
+    x05 ^ y05 => wwm, wwm ^ tsw => hdt (should be z05)              x05 & y05 => mkq, wwm & tsw => rnk, rnk | mkq -> z05 (should be hdt)
+    ... 
+    x06 ^ y06 => gwg, gwg ^ hdt => z06                              x05 & y05 => wgp, gwg & hdt => ncj, wgp | hdt -> jjg (jjg is overflow from z06 -> z07)
+    x07 ^ y07 => shj, shj ^ jjg => z07                              x06 & y07 => sdq, shj & jjg => pbk, sdq | pbk => ggp (ggp is overflow from z07 -> z08)
+    x08 ^ y08 => cjc, cjc ^ ggp => z08                              x08 & y08 => hrv, cjc & ggp => wvc, hrv | wvc => vkd (vkd is overflow from z08 -> z09)
+    x09 ^ y09 => wqr, wqr ^ vkd => gbf (should be z09)              x09 & y09 => z09 (should be gbf),  wqr & vkd => ttm, gbf | ttm => pdk (pdk is overflow from z09 -> z10)
+    x10 ^ y10 => fpp, fpp ^ pdk => z10                              x10 & y10 => cpd, fpp & pdk => fnn, cpd | fnn => tfh (tfh is overflow from z10 -> z11)
+    x11 ^ y11 => jrm, jrm ^ tfh => z11                              x11 & y11 => fqp, jrm & tfh => rng, fqp | rng => rfj (rfj is overflow from z11 -> z12)
+    x12 ^ y12 => msr, msr ^ rfj => z12                              x12 & y12 => hmn, msr & rfj => qnh, hmn | qnh => sfh (sfh is overflow from z12 -> z13)
+    x13 ^ y13 => fpd, fpd ^ sjf => z13                              x13 & y13 => dct, fpd & sjh => ffq, dct | ffq => gnt
+    x14 ^ y14 => hsh, hsh ^ gnt => z14                              x14 & y14 => bwr, hsh & gnt => bkm, bwr | bkm => fgc
+    x15 ^ y15 => jgt (should be mht), mht ^ fgc => z15              x15 & y15 => mht (should be jgt), mht & fgc => nwr, jgt | nwr => shs
+    x16 ^ y16 => wnd, wnd ^ shs => z16                              x16 & y16 => qsm, wnd & shs => pgd, qsm | pgd => prk
+    x17 ^ y17 => jhw, jhw ^ prk => z17                              x17 & y17 => cdh, jhw & prk => wjj, cdh | wjj => qnk
+    x18 ^ y18 => fcm, fcm ^ qnk => z18                              x18 & y18 => nwb, fcm & qnk => pnt, nwb | pnt => bnk
+    x19 ^ y19 => qww, qww ^ bnk => z19                              x19 & y19 => sgc, qww & bnk => frn, sgc | frn => kbw
+    x20 ^ y20 => cnq, cnq ^ kbw => z20                              x20 & y20 => nqw, cnq & kbw => tdh, nqw | tdh => bfg
+    x21 ^ y21 => rsw, rsw ^ bfg => z21                              x21 & y21 => rkv, rsw & bfg => mbt, rkv | mbt => tmd
+    x22 ^ y22 => fsp, fsp ^ tmd => z22                              x22 & y22 => dvc, fsp & tmd => rtw, dvc | rtw => chk
+    x23 ^ y23 => tqk, tqk ^ chk => z23                              x23 & y23 => sjk, tqk & chk => mnm, sjk | mnm => gmj
+    x24 ^ y24 => swf, swf ^ gmj => z24                              x24 & y24 => dwp, swf & gmj => ccj, dwp | ccj => grc
+    x25 ^ y25 => tqf, tqf ^ grc => z25                              x25 & y25 => dmw, tqf & grc => grd, dmw | grd => dgc
+    x26 ^ y26 => vwb, vwb ^ dgc => z26                              x26 & y26 => hts, vwb & dgc => hqr, hts | hqr => djp
+    x27 ^ y27 => vsk, vsk ^ djp => z27                              x27 & y27 => sfr, vsk & djp => wkn, sfr | wkn => jsd
+    x28 ^ y28 => kbc, kbc ^ jsd => z28                              x28 & y28 => bmh, kbc & jsd => jbf, bmh | jbf => qdw
+    x29 ^ y29 => mhh, mhh ^ qdw => z29                              x29 & y29 => jnk, mhh & qdw => hdf, jnk | hdf => nvv
+    x30 ^ y30 => dpr, dpr ^ nvv => nbf (should be z30)                              x30 & y30 => kqh, dpr & nvv => z30 (should be nbf), kqh | nbf => rrc
+    x31 ^ y31 => bsn, bsn ^ rrc => z31                              x31 & y31 => mfb, bsn & rrc => vfs, mfb | vfs => ssr
+
+    x44 ^ y44 => wdq, wdq ^ ggg => z44                              x44 & y44 => qhs, ggg & wdq => vkm, vkm | qhs -> z45 (z45 is directly overflowed into)
+
+
+gbf,hdt,jgt,mht,nbf,z05,z09,z30
+     */
+
+    fn get_expected_x_and_y_wires_from_z(z_value_wire: &str) -> (String, String) {
+        let value_wire_id = Regex::new(r"^z(\d+)$").unwrap();
+        let caps = value_wire_id.captures(z_value_wire).unwrap();
+        let x_wire = format!("x{}", &caps[1]);
+        let y_wire = format!("y{}", &caps[1]);
+        (x_wire, y_wire)
+    }
+
+    fn get_expected_xy_combine_gates(&self, expected_x_wire: &str, expected_y_wire: &str) -> (&Gate, &Gate) {
+        let mut xor_gate: Option<&Gate> = None;
+        let mut and_gate: Option<&Gate> = None;
+        for (result_wire, gate) in &self.gates {
+            if (gate.left == expected_x_wire && gate.right == expected_y_wire) || (gate.left == expected_y_wire && gate.right == expected_x_wire) {
+                if gate.op == GateOp::XOR { xor_gate = Some(gate); }
+                else if gate.op == GateOp::AND { and_gate = Some(gate); }
+            }
+        }
+        let (Some(xor), Some(and)) = (xor_gate, and_gate) else { panic!("Failed to find gates"); };
+        (xor, and)
+    }
+
+/*
+    fn part2(&self) -> String {
+
+        let value_wire_re = Regex::new(r"^(x|y|z)\d+").unwrap();
+        let mut z_value_wires = Vec::<&str>::new();
+        let mut y_value_wires = HashSet::<&str>::new();
+        let mut x_value_wires = HashSet::<&str>::new();
+
+        for wire in &self.wires {
+            if let Some(caps) = value_wire_re.captures(wire) {
+                if &caps[1] == "x" { x_value_wires.insert(wire); }
+                else if &caps[1] == "y" { y_value_wires.insert(wire); }
+                else { assert_eq!("z", &caps[1]); z_value_wires.push(wire); }
+            }
+        }
+
+        let mut and_gates = HashSet::<&Gate>::new();
+        let mut xor_gates = HashSet::<&Gate>::new();
+        let mut or_gates  = HashSet::<&Gate>::new();
+
+        for (result, gate) in &self.gates {
+            match gate.op {
+                GateOp::AND => and_gates.insert(&gate),
+                GateOp::XOR => xor_gates.insert(&gate),
+                GateOp::OR  => or_gates.insert(&gate),
+            };
+        }
+
+        z_value_wires.sort();
+        y_value_wires.sort();
+        x_value_wires.sort();
+
+        let bad_gate_list: Vec::<&Gate, z_value_wire>::new();
+
+        struct AdderGates<'a> {
+            z_value_wire: String,
+            x_xor_y: Option<&'a Gate>,
+            xy_xor_prev_overflow: Option<&'a Gate>,
+            overflow_x_and_y: Option<&'a Gate>,
+            overflow_prev_overflow_and_x_xor_y: Option<&'a Gate>,
+            overflow_gate: Option<&'a Gate>,
+        }
+
+        for (index, z_value_wire) in (&z_value_wires).into_iter().enumerate() {
+            let (expected_x_wire, expected_y_wire) = Self::get_expected_x_and_y_wires_from_z(z_value_wire);
+            let (expected_x_xor_y_gate, expected_overflow_calc_x_and_y_gate) = self.get_expected_xy_combine_gates(&expected_x_wire, &expected_y_wire);
+            if index == 0 {
+
+            }
+        }
+        /*
+        let overflow_wire: &str = &z_value_wires.last().unwrap();
+
+        for (index, z_value_wire) in (&z_value_wires).into_iter().rev().enumerate() {
+            if index > 0 {
+                let (expected_x_wire, expected_y_wire) = Self::get_expected_x_and_y_wires_from_z(z_value_wire);
+                // unvalidated result wires
+                let (expected_x_xor_y_gate, expected_overflow_calc_x_and_y_gate) = self.get_expected_xy_combine_gates(&expected_x_wire, &expected_y_wire);
+                let expected_overflow_gate = (&self.gates).get(overflow_wire).unwrap();             
+                let z_result_gate = (&self.gates).get(z_value_wire as &str).unwrap();
+
+                if expected_x_xor_y_gate.op != GateOp::XOR {
+                    bad_gate_list
+                }
+                if expected_overflow_calc_x_and_y_gate.op != GateOp::AND {
+
+                }
+
+                let mut xy_xor_prev_overflow: Option<&Gate> = None;  // 
+                let mut overflow_from_prev_overflow_and_x_xor_y: Option<&Gate> = None;  // wdq & ggg (vkm)
+                let mut overflow_gate: Option<&Gate> = None;         // qhs | vkm -> (z45)
+
+
+                
+                if z_result_gate.left != expected_x_xor_y_gate.target || z_result_gate.right != expected_x_xor_y_gate.target {
+                    // expected_x_xor_y_gate has wrong result wire
+                    // One of the wires should be the previous overflow wire, the other x_xor_y
+                }
+
+
+                if let Some(_(left_wire, right_wire, target_wire)) = (&self.gates).get(overflow_wire) {
+                    overflow_gate = Some(&gate);
+                    match ((&self.gates).get(gate.0), (&self.gates).get(gate.1)) {
+
+                    }
+                }
+            }
+            else {
+
+            }
+        }
+        */
+        "".to_string()
+    }
+    */
 }
 
 #[cfg(test)]
