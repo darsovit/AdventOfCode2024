@@ -70,73 +70,6 @@ fn get_numpad_position(button: &NumpadControl) -> (usize, usize) {
     }
 }
 
-fn move_and_activate_robot_arm(init: (usize, usize), dest: (usize, usize), bad_spot: (usize, usize)) -> Vec<RobotControl> {
-    let mut robot_controls = Vec::<RobotControl>::new();
-    let mut pos = init;
-
-    // If our cursor is on the row with the bad spot and if our destination column is on the bad spot column
-    // we want to move up or down first, otherwise, prefer moving left moves first because a robot controller has 
-    // the left control furthest away from activate
-    if dest.0 == bad_spot.0 && pos.1 == bad_spot.1 {
-        while pos.1 > dest.1 {
-            robot_controls.push(RobotControl::Down);
-            pos = (pos.0, pos.1 - 1);
-            assert_ne!(pos, bad_spot);
-        }
-        while pos.1 < dest.1 {
-            robot_controls.push(RobotControl::Up);
-            pos = (pos.0, pos.1 + 1);
-            assert_ne!(pos, bad_spot);
-        }
-    }
-    while pos.0 < dest.0 {
-        robot_controls.push(RobotControl::Left);
-        pos = (pos.0 + 1, pos.1);
-        assert_ne!(pos, bad_spot);
-    }
-    // For numpad
-    // if our destination row is the same row as the bad spot, and our position column matches, prefer
-    // to go right before moving down onto the bad spot
-    if dest.1 == bad_spot.1 && pos.0 == bad_spot.0 {
-        while pos.0 > dest.0 {
-            robot_controls.push(RobotControl::Right);
-            pos = (pos.0 - 1, pos.1);
-            assert_ne!(pos, bad_spot);
-        }            
-    }
-    while pos.1 > dest.1 {
-        robot_controls.push(RobotControl::Down);
-        pos = (pos.0, pos.1 - 1);
-        assert_ne!(pos, bad_spot);
-    }
-    while pos.0 > dest.0 {
-        robot_controls.push(RobotControl::Right);
-        pos = (pos.0 - 1, pos.1);
-        assert_ne!(pos, bad_spot);
-    }
-    while pos.1 < dest.1 {
-        robot_controls.push(RobotControl::Up);
-        pos = (pos.0, pos.1 + 1);
-        assert_ne!(pos, bad_spot);
-    }
-
-    robot_controls.push(RobotControl::Activate);
-    robot_controls
-}
-
-fn numpad_control_sequence(init: NumpadControl, dest: &NumpadControl) -> Vec<RobotControl> {
-    let start_pos = get_numpad_position(&init);
-    let end_pos   = get_numpad_position(dest);
-    move_and_activate_robot_arm(start_pos, end_pos, (2, 0))
-}
-
-
-fn robot_control_sequence(init: &RobotControl, dest: &RobotControl) -> Vec<RobotControl> {
-    let start_pos = get_robot_control_position(init);
-    let end_pos   = get_robot_control_position(dest);
-    move_and_activate_robot_arm(start_pos, end_pos, (2, 1))
-}
-
 fn char_to_numpad_control(a_char: char) -> NumpadControl {
     match a_char {
         'A' => NumpadControl::Activate,
@@ -153,137 +86,212 @@ fn char_to_numpad_control(a_char: char) -> NumpadControl {
         _ => panic!("Unknown character: {a_char} requested from numpad control"),
     }
 }
-
-fn numpad_sequence(output: &str) -> Vec<RobotControl> {
-    let mut robot_controls = Vec::<RobotControl>::new();
-    let mut last_position = NumpadControl::Activate;
-    for next in output.chars() {
-        let next = char_to_numpad_control(next);
-        robot_controls.append(&mut numpad_control_sequence(last_position, &next));
-        last_position = next;
-    }
-    robot_controls
-}
-
-fn robot_sequence(robot_controls: &Vec<RobotControl>) -> Vec<RobotControl> {
-    let mut output_controls = Vec::<RobotControl>::new();
-    let mut last_position = RobotControl::Activate;
-    for control in robot_controls {
-        output_controls.append(&mut robot_control_sequence(&last_position, control));
-        last_position = *control;
-    }
-    output_controls
-}
-
-fn code_as_number(code: &str) -> usize {
-    let number_re = Regex::new(r"(\d+)A").unwrap();
-    let number = number_re.captures(code).unwrap();
-    number[1].parse::<usize>().unwrap()
-}
-
-fn complexity_length(code: &str) -> usize {
-    let user_sequence = robot_sequence(&mut robot_sequence(&mut numpad_sequence(code)));
-    user_sequence.len()
-}
-
-fn robot_control_sequence_n(last_control: &RobotControl, next_control: &RobotControl, n: usize) -> Vec<RobotControl> {
-    let mut result = robot_control_sequence(last_control, next_control);
-    for _ in 0..n-1 {
-        // Once we're down at least one level, it will always start at Activate
-        result = robot_sequence(&result);
-    }
-    result
-}
-
-fn build_control_counts(sequence: &Vec<RobotControl>) -> HashMap<(RobotControl, RobotControl), usize> {
-    let mut control_pattern_counts: HashMap<(RobotControl, RobotControl), usize> = HashMap::new();
-    let mut last_control = RobotControl::Activate;
-    for control in sequence {
-        *control_pattern_counts.entry((last_control, *control)).or_insert(0) += 1;
-        last_control = *control;
-    }
-    control_pattern_counts
-}
-
-fn calculate_next_5(lower_count: &HashMap<(RobotControl, RobotControl), usize>,
-                    cache_of_5_levels: &mut HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>>)
-         -> HashMap<(RobotControl, RobotControl), usize> {
-    let mut new_count_of_sequences = HashMap::new();
-    for (pattern, count) in lower_count {
-        let result = cache_of_5_levels.entry(*pattern).or_insert(build_control_counts(&robot_control_sequence_n(&pattern.0, &pattern.1, 5)));
-        for (result_pattern, result_count) in result {
-            let val = new_count_of_sequences.entry(*result_pattern).or_insert(0);
-            *val += *result_count * count;
-        }
-    }
-    new_count_of_sequences
-}
-
-fn calculate_next(lower_count: &HashMap<(RobotControl, RobotControl), usize>,
-                  cache_of_controls: &mut HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>>)
-         -> HashMap<(RobotControl, RobotControl), usize> {
-    let mut new_count_of_sequences = HashMap::new();
-    for (pattern, count) in lower_count {
-        let result = cache_of_controls.entry(*pattern).or_insert(build_control_counts(&robot_control_sequence_n(&pattern.0, &pattern.1, 1)));
-        for (result_pattern, result_count) in result {
-            let val = new_count_of_sequences.entry(*result_pattern).or_insert(0);
-            *val += *result_count * count;
-        }
-    }
-    new_count_of_sequences
-}
-
-fn pt2_complexity_length_n_dir_robots(code: &str, n: usize) -> usize {
-    assert!(n > 1);
-    let first_control_sequence = numpad_sequence(code);
-    let mut cache_for_dir: HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>> = HashMap::new();
-
-    let mut sequence_for_first_control = Vec::<RobotControl>::new();
-    let mut last_control = RobotControl::Activate;
-    for next_control in first_control_sequence {
-        let mut sequence = robot_control_sequence(&last_control, &next_control);
-        cache_for_dir.entry((last_control, next_control)).or_insert(build_control_counts(&sequence));
-        sequence_for_first_control.append(&mut sequence);
-        last_control = next_control;
-    }
-
-    let mut count_of_sequences = build_control_counts(&sequence_for_first_control);
-    for _ in 0..n-1 {
-        count_of_sequences = calculate_next(&count_of_sequences, &mut cache_for_dir);
-    }
-
-    let mut num_steps_at_n_deep = 0;
-    for (_, count) in count_of_sequences {
-        num_steps_at_n_deep += count;
-    }
-    num_steps_at_n_deep
-}
-
-fn pt2_complexity_length(code: &str) -> usize {
-    let numpad_control_sequence = numpad_sequence(code);
-    let mut cache_of_5_levels: HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>> = HashMap::new();
-
-    let mut last_control = RobotControl::Activate;
-    let mut sequence_for_5_for_all = Vec::<RobotControl>::new();
-    for next_control in numpad_control_sequence {
-        let mut sequence_for_5 = robot_control_sequence_n(&last_control, &next_control, 5);
-        cache_of_5_levels.entry((last_control, next_control)).or_insert(build_control_counts(&sequence_for_5));
-        sequence_for_5_for_all.append(&mut sequence_for_5);
-        last_control = next_control;
-    }
-
-    let mut count_of_sequences = build_control_counts(&sequence_for_5_for_all);
-    for _ in 0..4 {
-        count_of_sequences = calculate_next_5(&count_of_sequences, &mut cache_of_5_levels);
-    }
-    let mut num_steps_at_25_deep: usize = 0;
-    for (_, count) in count_of_sequences {
-        num_steps_at_25_deep += count;
-    }
-    num_steps_at_25_deep
-}
-
 impl Day21 {
+    fn move_and_activate_robot_arm(init: (usize, usize), dest: (usize, usize), bad_spot: (usize, usize)) -> Vec<RobotControl> {
+        let mut robot_controls = Vec::<RobotControl>::new();
+        let mut pos = init;
+
+        // If our cursor is on the row with the bad spot and if our destination column is on the bad spot column
+        // we want to move up or down first, otherwise, prefer moving left moves first because a robot controller has
+        // the left control furthest away from activate
+        if dest.0 == bad_spot.0 && pos.1 == bad_spot.1 {
+            while pos.1 > dest.1 {
+                robot_controls.push(RobotControl::Down);
+                pos = (pos.0, pos.1 - 1);
+                assert_ne!(pos, bad_spot);
+            }
+            while pos.1 < dest.1 {
+                robot_controls.push(RobotControl::Up);
+                pos = (pos.0, pos.1 + 1);
+                assert_ne!(pos, bad_spot);
+            }
+        }
+        while pos.0 < dest.0 {
+            robot_controls.push(RobotControl::Left);
+            pos = (pos.0 + 1, pos.1);
+            assert_ne!(pos, bad_spot);
+        }
+        // For numpad
+        // if our destination row is the same row as the bad spot, and our position column matches, prefer
+        // to go right before moving down onto the bad spot
+        if dest.1 == bad_spot.1 && pos.0 == bad_spot.0 {
+            while pos.0 > dest.0 {
+                robot_controls.push(RobotControl::Right);
+                pos = (pos.0 - 1, pos.1);
+                assert_ne!(pos, bad_spot);
+            }
+        }
+        while pos.1 > dest.1 {
+            robot_controls.push(RobotControl::Down);
+            pos = (pos.0, pos.1 - 1);
+            assert_ne!(pos, bad_spot);
+        }
+        // on sequences of (A)^>A, it's better to prefer the up first, because it subsequently requires moving left which we like to front load
+        // consider:
+        //       >           ^     A                  ^         >     A
+        //   v   A    <   ^  A  >  A             <    A  >   ^  A  ^  A
+        // <vA >^A v<<A >^A >A vA ^A (19)     v<<A >>^A vA <^A >A <A >A (19), but this set of 19, is going to save later (because of two repeated patterns as a result of hitting < A to shorten the next phase)
+        //          AA                         AA  AA
+        while pos.1 < dest.1 {
+            robot_controls.push(RobotControl::Up);
+            pos = (pos.0, pos.1 + 1);
+            assert_ne!(pos, bad_spot);
+        }
+        while pos.0 > dest.0 {
+            robot_controls.push(RobotControl::Right);
+            pos = (pos.0 - 1, pos.1);
+            assert_ne!(pos, bad_spot);
+        }
+
+        robot_controls.push(RobotControl::Activate);
+        robot_controls
+    }
+
+    fn numpad_control_sequence(init: NumpadControl, dest: &NumpadControl) -> Vec<RobotControl> {
+        let start_pos = get_numpad_position(&init);
+        let end_pos   = get_numpad_position(dest);
+        Self::move_and_activate_robot_arm(start_pos, end_pos, (2, 0))
+    }
+
+
+    fn robot_control_sequence(init: &RobotControl, dest: &RobotControl) -> Vec<RobotControl> {
+        let start_pos = get_robot_control_position(init);
+        let end_pos   = get_robot_control_position(dest);
+        let controls = Self::move_and_activate_robot_arm(start_pos, end_pos, (2, 1));
+        controls
+    }
+
+
+    fn numpad_sequence(output: &str) -> Vec<RobotControl> {
+        let mut robot_controls = Vec::<RobotControl>::new();
+        let mut last_position = NumpadControl::Activate;
+        for next in output.chars() {
+            let next = char_to_numpad_control(next);
+            robot_controls.append(&mut Self::numpad_control_sequence(last_position, &next));
+            last_position = next;
+        }
+        robot_controls
+    }
+
+    fn robot_sequence(robot_controls: &Vec<RobotControl>) -> Vec<RobotControl> {
+        let mut output_controls = Vec::<RobotControl>::new();
+        let mut last_position = RobotControl::Activate;
+        for control in robot_controls {
+            output_controls.append(&mut Self::robot_control_sequence(&last_position, control));
+            last_position = *control;
+        }
+        output_controls
+    }
+
+    fn code_as_number(code: &str) -> usize {
+        let number_re = Regex::new(r"(\d+)A").unwrap();
+        let number = number_re.captures(code).unwrap();
+        number[1].parse::<usize>().unwrap()
+    }
+
+    fn complexity_length(code: &str) -> usize {
+        let user_sequence = Self::robot_sequence(&mut Self::robot_sequence(&mut Self::numpad_sequence(code)));
+        user_sequence.len()
+    }
+
+    fn robot_control_sequence_n(last_control: &RobotControl, next_control: &RobotControl, n: usize) -> Vec<RobotControl> {
+        let mut result = Self::robot_control_sequence(last_control, next_control);
+        for _ in 0..n-1 {
+            // Once we're down at least one level, it will always start at Activate
+            result = Self::robot_sequence(&result);
+        }
+        result
+    }
+
+    fn build_control_counts(sequence: &Vec<RobotControl>) -> HashMap<(RobotControl, RobotControl), usize> {
+        let mut control_pattern_counts: HashMap<(RobotControl, RobotControl), usize> = HashMap::new();
+        let mut last_control = RobotControl::Activate;
+        for control in sequence {
+            *control_pattern_counts.entry((last_control, *control)).or_insert(0) += 1;
+            last_control = *control;
+        }
+        control_pattern_counts
+    }
+
+    fn calculate_next_5(lower_count: &HashMap<(RobotControl, RobotControl), usize>,
+                        cache_of_5_levels: &mut HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>>)
+            -> HashMap<(RobotControl, RobotControl), usize> {
+        let mut new_count_of_sequences = HashMap::new();
+        for (pattern, count) in lower_count {
+            let result = cache_of_5_levels.entry(*pattern).or_insert(Self::build_control_counts(&Self::robot_control_sequence_n(&pattern.0, &pattern.1, 5)));
+            for (result_pattern, result_count) in result {
+                let val = new_count_of_sequences.entry(*result_pattern).or_insert(0);
+                *val += *result_count * count;
+            }
+        }
+        new_count_of_sequences
+    }
+
+    fn calculate_next(lower_count: &HashMap<(RobotControl, RobotControl), usize>,
+                    cache_of_controls: &mut HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>>)
+            -> HashMap<(RobotControl, RobotControl), usize> {
+        let mut new_count_of_sequences = HashMap::new();
+        for (pattern, count) in lower_count {
+            let result = cache_of_controls.entry(*pattern).or_insert(Self::build_control_counts(&Self::robot_control_sequence_n(&pattern.0, &pattern.1, 1)));
+            for (result_pattern, result_count) in result {
+                let val = new_count_of_sequences.entry(*result_pattern).or_insert(0);
+                *val += *result_count * count;
+            }
+        }
+        new_count_of_sequences
+    }
+
+    fn pt2_complexity_length_n_dir_robots(code: &str, n: usize) -> usize {
+        assert!(n > 1);
+        let first_control_sequence = Self::numpad_sequence(code);
+        let mut cache_for_dir: HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>> = HashMap::new();
+
+        let mut sequence_for_first_control = Vec::<RobotControl>::new();
+        let mut last_control = RobotControl::Activate;
+        for next_control in first_control_sequence {
+            let mut sequence = Self::robot_control_sequence(&last_control, &next_control);
+            cache_for_dir.entry((last_control, next_control)).or_insert(Self::build_control_counts(&sequence));
+            sequence_for_first_control.append(&mut sequence);
+            last_control = next_control;
+        }
+
+        let mut count_of_sequences = Self::build_control_counts(&sequence_for_first_control);
+        for _ in 0..n-1 {
+            count_of_sequences = Self::calculate_next(&count_of_sequences, &mut cache_for_dir);
+        }
+
+        let mut num_steps_at_n_deep = 0;
+        for (_, count) in count_of_sequences {
+            num_steps_at_n_deep += count;
+        }
+        num_steps_at_n_deep
+    }
+
+    fn pt2_complexity_length(code: &str) -> usize {
+        let numpad_control_sequence = Self::numpad_sequence(code);
+        let mut cache_of_5_levels: HashMap<(RobotControl, RobotControl), HashMap<(RobotControl, RobotControl), usize>> = HashMap::new();
+
+        let mut last_control = RobotControl::Activate;
+        let mut sequence_for_5_for_all = Vec::<RobotControl>::new();
+        for next_control in numpad_control_sequence {
+            let mut sequence_for_5 = Self::robot_control_sequence_n(&last_control, &next_control, 5);
+            cache_of_5_levels.entry((last_control, next_control)).or_insert(Self::build_control_counts(&sequence_for_5));
+            sequence_for_5_for_all.append(&mut sequence_for_5);
+            last_control = next_control;
+        }
+
+        let mut count_of_sequences = Self::build_control_counts(&sequence_for_5_for_all);
+        for _ in 0..4 {
+            count_of_sequences = Self::calculate_next_5(&count_of_sequences, &mut cache_of_5_levels);
+        }
+        let mut num_steps_at_25_deep: usize = 0;
+        for (_, count) in count_of_sequences {
+            num_steps_at_25_deep += count;
+        }
+        num_steps_at_25_deep
+    }
+
+
     pub fn new(lines: std::str::Lines<'_>) -> Self {
         let mut codes = Vec::<String>::new();
         for line in lines {
@@ -295,10 +303,10 @@ impl Day21 {
     pub fn part1(&self) -> usize {
         let mut sum_of_complexities = 0;
         for code in &self.codes {
-            let pt1_complexity_via_pt2 = pt2_complexity_length_n_dir_robots(code, 2);
-            let pt1_complexity_len = complexity_length(code);
+            let pt1_complexity_via_pt2 = Self::pt2_complexity_length_n_dir_robots(code, 2);
+            let pt1_complexity_len = Self::complexity_length(code);
             println!("{code}: {pt1_complexity_len} {pt1_complexity_via_pt2}");
-            sum_of_complexities += pt1_complexity_len * code_as_number(code);
+            sum_of_complexities += pt1_complexity_len * Self::code_as_number(code);
         }
         sum_of_complexities
     }
@@ -307,16 +315,16 @@ impl Day21 {
         let mut sum_of_complexities = 0;
 
         for code in &self.codes {
-            let pt2_complexity_len = pt2_complexity_length_n_dir_robots(code, 25);
+            let pt2_complexity_len = Self::pt2_complexity_length_n_dir_robots(code, 25);
             println!("{code}: {pt2_complexity_len}");
-            sum_of_complexities += pt2_complexity_len * code_as_number(code);
+            sum_of_complexities += pt2_complexity_len * Self::code_as_number(code);
         }
         println!("pt2, first: {sum_of_complexities}");
         sum_of_complexities = 0;
         for code in &self.codes {
-            let pt2_complexity_len= pt2_complexity_length(code);
+            let pt2_complexity_len= Self::pt2_complexity_length(code);
             println!("{code}: {pt2_complexity_len}");
-            sum_of_complexities += pt2_complexity_len * code_as_number(code);
+            sum_of_complexities += pt2_complexity_len * Self::code_as_number(code);
         }
         sum_of_complexities
     }
@@ -334,19 +342,19 @@ mod tests {
 
     #[test]
     fn validate_sequence_029A_length() {
-        let robot_controls = numpad_sequence("029A");
+        let robot_controls = Day21::numpad_sequence("029A");
         assert_eq!(12, robot_controls.len());
     }
 
     #[test]
     fn validate_sequence_029A_through_two_robots_length() {
-        let result_robot_controls = robot_sequence(&mut numpad_sequence("029A"));
+        let result_robot_controls = Day21::robot_sequence(&mut Day21::numpad_sequence("029A"));
         assert_eq!(28, result_robot_controls.len());
     }
 
     #[test]
     fn validate_sequence_029A_through_three_robots_length() {
-        let robot3_controls = robot_sequence(&mut robot_sequence(&mut numpad_sequence("029A")));
+        let robot3_controls = Day21::robot_sequence(&mut Day21::robot_sequence(&mut Day21::numpad_sequence("029A")));
 
         assert_eq!(68, robot3_controls.len());
     }
@@ -359,35 +367,37 @@ mod tests {
 
     #[test]
     fn sample_029A_complexity_is_29() {
-        assert_eq!(68, complexity_length("029A"));
+        assert_eq!(68, Day21::complexity_length("029A"));
     }
 
     #[test]
     fn sample_980A_complexity_is_60() {
-        assert_eq!(60, complexity_length("980A"));
+        assert_eq!(60, Day21::complexity_length("980A"));
     }
 
     #[test]
     fn sample_179A_complexity_is_68() {
-        assert_eq!(68, complexity_length("179A"));
+        assert_eq!(68, Day21::complexity_length("179A"));
     }
 
     #[test]
     fn sample_456A_complexity_is_64() {
-        assert_eq!(64, complexity_length("456A"));
+        assert_eq!(64, Day21::complexity_length("456A"));
     }
 
     #[test]
     fn sample_379A_complexity_is_64() {
-        assert_eq!(64, complexity_length("379A"));
-        //               3                                  7              9                       A
-        //         ^     A         ^^           <<          A       >>     A           vvv         A
-        //    <    A  >  A    <    AA   v  <    AA  >>   ^  A   v   AA  ^  A   v  <    AAA  >   ^  A
-        // v<<A >>^A vA ^A v<<A >>^AA v<A <A >>^AA vAA ^<A >A v<A >^AA <A >A v<A <A >>^AAA vA ^<A >A
+        assert_eq!(64, Day21::complexity_length("379A"));
+        //                                     3                                      7              9                       A
+        //                       ^             A                    <<         ^^     A       >>     A           vvv         A
+        //            <          A       >     A           v  <<    AA  >   ^  AA  >  A   v   AA  ^  A    <  v   AAA  >   ^  A
+        //   v  <<    A  >>   ^  A   v   A  ^  A    <  v   A <AA >>^AA vA <^A >AA vA ^A <vA >^AA <A >A v<<A >A >^AAA vA <^A >A
+        // <vA <AA >>^A vAA ^<A >A v<A >^A <A >A v<<A >A >^A
 
-        //               3                                 7
-        //         ^     A               <<         ^^     A
-        //    <    A  >  A    v    <<    AA  >   ^  AA  >  A
-        // <v<A >>^A vA ^A  <vA   <AA >>^AA vA <^A >AA vA ^A <vA >^AA <A >A <v<A >A >^AAA vA <^A >A
+        //                                        3                                 7
+        //                          ^             A               <<         ^^     A
+        //               <          A       >     A    v    <<    AA  >   ^  AA  >  A
+        //    <  v  <    A  >>   ^  A   v   A  ^  A  <vA   <AA >>^AA vA <^A >AA vA ^A <vA >^AA <A >A <v<A >A >^AAA vA <^A >A
+        // <v<A >A <A >>^A vAA <^A >A <vA >^A <A >A
     }
 }
