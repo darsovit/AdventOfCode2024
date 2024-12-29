@@ -70,7 +70,8 @@ impl Day14 {
         self.part1_sized(103, 101)
     }
     pub fn part2(&self) -> usize {
-        let mut time: usize = 1;
+        // 351 is the first thing that looks like it's putting things together
+        let mut time: usize = 351;
         loop {
             let mut display = vec![ vec![ '.'; 101]; 103];
 
@@ -79,15 +80,17 @@ impl Day14 {
                 let robot_pos = (robot_pos.0 as usize, robot_pos.1 as usize);
                 display[robot_pos.0][robot_pos.1] = '*';
             }
-            println!("Display at {time}");
+
             for line in &display {
                 for pos in line {
                     print!("{pos}");
                 }
                 println!("");
             }
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            time += 1;
+            println!("Display at {time}");
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            // the time between cycles when the item looks closer together (which seems obvious now seeing the width)
+            time += 101;
         }
     }
 }
