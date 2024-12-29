@@ -69,6 +69,27 @@ impl Day14 {
     pub fn part1(&self) -> usize {
         self.part1_sized(103, 101)
     }
+    pub fn part2(&self) -> usize {
+        let mut time: usize = 1;
+        loop {
+            let mut display = vec![ vec![ '.'; 101]; 103];
+
+            for robot in &self.robots {
+                let robot_pos = Self::find_loc_robot(robot, time, 103, 101).position;
+                let robot_pos = (robot_pos.0 as usize, robot_pos.1 as usize);
+                display[robot_pos.0][robot_pos.1] = '*';
+            }
+            println!("Display at {time}");
+            for line in &display {
+                for pos in line {
+                    print!("{pos}");
+                }
+                println!("");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            time += 1;
+        }
+    }
 }
 
 #[cfg(test)]
